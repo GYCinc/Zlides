@@ -34,3 +34,31 @@ saved_slides/
 
 node_modules
 frontend_svelte/node_modules
+
+# Internal/planning files (not for public repo)
+.planning/
+.trash/
+.windsurfrules
+AGENTS.md
+PLAN.md
+*.desktop
+api-reference/
+api-reference-project/
+cost_calc.py
+lesson_notes_*.md
+main.py
+mcp_wrapper.py
+sample_stream.json
+frontend/
+frontend_svelte/README.md
+frontend_svelte/package-lock.json
+frontend_svelte/src/lib/Counter.svelte
+frontend_svelte/src/assets/
+frontend_svelte/svelte_log.txt
+frontend_svelte/thinking.json
+index.html
+style_bank/extracted_*.json
+assets/logo-alt.png
+
+# PREFERENCES (personal)
+PREFERENCES.md
