@@ -21,6 +21,10 @@
   let isUploading = false;
   let status = "Ready";
 
+  let customApiKey = "";
+  let customBaseUrl = "";
+  let showApiSettings = false;
+
   let slides: any[] = [];
   let currentSlideIndex = 0;
   // Included a mock RR button to prove the concept works when dropped in
@@ -32,6 +36,11 @@
   let uploadMode = "content"; // 'content' or 'style'
 
   onMount(async () => {
+    if (typeof localStorage !== 'undefined') {
+      customApiKey = localStorage.getItem('zlides_api_key') || '';
+      customBaseUrl = localStorage.getItem('zlides_base_url') || '';
+    }
+
     // Load styles from the backend
     try {
       const resp = await fetch("/styles");
@@ -87,7 +96,7 @@
     pageCount;
     updateCost();
   }
-  $: isBatchMode = promptText.toLowerCase().includes("batch") || promptText.includes("\n\n");
+  $: isBatchMode = promptText.trim().startsWith("/batch");
 
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -100,6 +109,9 @@
       formData.append("file", files[0]);
 
       formData.append("type", uploadMode);
+      if (customApiKey) {
+        formData.append("api_key", customApiKey);
+      }
 
       try {
         const res = await fetch("/upload", { method: "POST", body: formData });
@@ -148,7 +160,7 @@ let currentController: AbortController | null = null;
   let chatMessages: any[] = [{ role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
   let selectedFormat = "slides";
   let selectedStyle = "auto";
-  let pageCount = 5;
+  let pageCount: number | null = null;
   let availableStyles: any[] = [];
 
   let showStyleEditor = false;
@@ -280,6 +292,27 @@ let currentController: AbortController | null = null;
     }
   }
 
+  function exportPdf() {
+    if (!slides.length) return;
+    const html = slides[currentSlideIndex].html;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 400);
+  }
+
+  function exportHtml() {
+    if (!slides.length) return;
+    const html = slides[currentSlideIndex].html;
+    const blob = new Blob([html], { type: 'text/html' });
+    const link = document.createElement('a');
+    link.download = `slide_${currentSlideIndex + 1}.html`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
 
   function extractImages(thought: string) {
     const images = [];
@@ -385,6 +418,8 @@ let currentController: AbortController | null = null;
           format: selectedFormat,
           style: selectedStyle,
           page_count: pageCount,
+          api_key: customApiKey || undefined,
+          base_url: customBaseUrl || undefined,
         }),
         signal: currentController.signal
       });
@@ -428,18 +463,17 @@ let currentController: AbortController | null = null;
                 if (data.type === 'thinking') {
                   thinkingBuffer += data.text;
 
-                  // Simple heuristic: if we hit a newline or sentence end, push a thought.
-                  if (thinkingBuffer.match(/[\.\n]/)) {
-                      let sentences = thinkingBuffer.split(/(?<=[\.\n])/);
-                      for (let i = 0; i < sentences.length - 1; i++) {
-                         let s = sentences[i].trim();
-                         if (s) thoughts = [...thoughts, s];
-                      }
-                      thinkingBuffer = sentences[sentences.length - 1];
-                  } else if (thinkingBuffer.length > 50) {
-                      // fallback if no punctuation but long text
-                      thoughts = [...thoughts, thinkingBuffer.trim()];
-                      thinkingBuffer = '';
+                  // Batch thoughts by paragraph (double newline) or at 150+ chars on a single newline
+                  const paragraphBreak = thinkingBuffer.indexOf('\n\n');
+                  const singleBreak = thinkingBuffer.lastIndexOf('\n');
+                  if (paragraphBreak !== -1) {
+                    const batch = thinkingBuffer.substring(0, paragraphBreak).trim();
+                    if (batch) thoughts = [...thoughts, batch];
+                    thinkingBuffer = thinkingBuffer.substring(paragraphBreak + 2);
+                  } else if (thinkingBuffer.length > 150 && singleBreak !== -1) {
+                    const batch = thinkingBuffer.substring(0, singleBreak).trim();
+                    if (batch) thoughts = [...thoughts, batch];
+                    thinkingBuffer = thinkingBuffer.substring(singleBreak + 1);
                   }
                 }
 
@@ -583,14 +617,19 @@ isThinking = false;
 
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
-  <div class="w-full md:w-[400px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-y-auto">
+  <div class="w-full md:w-[500px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
     <div class="space-y-1 flex-shrink-0">
       <div class="flex items-center gap-2 flex-wrap">
-        <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway flex items-center gap-2">
+          Zlides V2
+          <button on:click={() => showApiSettings = true} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="API Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </h1>
         {#if isBatchMode}
           <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
         {:else}
-          <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
+          <span class="text-[10px] text-ge-text-muted/70 italic">Mongoose Fast</span>
         {/if}
         <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-success font-mono font-bold" title="Estimated Cost">
           ${cost.toFixed(3)}
@@ -609,24 +648,22 @@ isThinking = false;
 
     <!-- UI Controls -->
     <div class="flex flex-col gap-2 flex-shrink-0 text-xs">
-      <div class="grid grid-cols-3 gap-1.5">
-        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
-          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Fmt</span>
-          <select bind:value={selectedFormat} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 min-w-0">
+      <div class="grid grid-cols-3 gap-2">
+        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Format">
+          <select bind:value={selectedFormat} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-1 font-semibold uppercase tracking-wider text-center">
             {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
               <option value={fmt} class="bg-ge-card text-ge-text">{fmt}</option>
             {/each}
           </select>
         </div>
 
-        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent relative">
-          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Style</span>
-          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 pr-10 min-w-0">
+        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Style Theme">
+          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-1 pr-12 font-semibold uppercase tracking-wider text-center">
             {#each availableStyles as style}
               <option value={style.id} class="bg-ge-card text-ge-text">{style.name}</option>
             {/each}
           </select>
-          <div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+          <div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {#if selectedStyle !== 'auto'}
               <button on:click={openStyleEditor} class="hover:text-ge-accent text-ge-text-muted hover:border-ge-accent text-[10px] p-0.5 bg-ge-card border border-ge-border rounded flex items-center justify-center h-5 w-5 pointer-events-auto transition-colors" title="Edit Style">
                 <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -638,15 +675,14 @@ isThinking = false;
           </div>
         </div>
 
-        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
-          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Pages</span>
-          <input type="number" bind:value={pageCount} min="1" max="20" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-full text-xs p-0 min-w-0" title="Page Count">
+        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent" title="Number of Pages">
+          <input type="number" bind:value={pageCount} min="1" max="20" placeholder="Auto Pages" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-full text-xs p-1 text-center font-semibold uppercase tracking-wider placeholder:text-ge-text-muted/65">
         </div>
       </div>
     </div>
 
     <!-- Chat History -->
-    <div id="chat-history" class="flex-grow overflow-y-auto flex flex-col gap-2.5 p-3 bg-ge-bg/30 rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset">
+    <div id="chat-history" class="flex-grow overflow-y-auto overflow-x-hidden min-w-0 flex flex-col gap-2.5 p-3 bg-ge-bg/30 rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset">
       {#each chatMessages as msg}
         {#if msg.role !== 'thinking'}
         <div class="p-2.5 rounded-lg max-w-[85%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm' : 'bg-ge-bg/55 text-ge-text-muted mr-auto border border-ge-border/30'}">
@@ -665,7 +701,7 @@ isThinking = false;
       {/each}
 
       {#if thoughts.length > 0 || isThinking}
-        <div class="p-2 rounded max-w-[90%] w-full bg-transparent text-ge-text-muted mr-auto">
+        <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
           <ChainOfThought.Root open={isThinking} defaultOpen={true}>
             <ChainOfThought.Header />
             <ChainOfThought.Content>
@@ -871,12 +907,40 @@ isThinking = false;
           </div>
         </div>
       {/if}
+
+      {#if showApiSettings}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-30 overflow-y-auto border-r border-ge-border">
+          <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">API Settings</h2>
+            <button on:click={() => showApiSettings = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+          </div>
+
+          <div class="flex flex-col gap-4 text-xs flex-grow">
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Z.AI API Key</label>
+              <input type="password" bind:value={customApiKey} placeholder="Leave blank to use server default" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent" />
+              <p class="text-[10px] text-ge-text-muted mt-1">Provide your own Z.AI key to use Zlides on this machine.</p>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Base URL</label>
+              <input type="text" bind:value={customBaseUrl} placeholder="https://api.z.ai" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent" />
+            </div>
+
+            <div class="flex gap-2 mt-auto pt-4 border-t border-ge-border">
+              <button on:click={() => { localStorage.setItem('zlides_api_key', customApiKey); localStorage.setItem('zlides_base_url', customBaseUrl); showApiSettings = false; status = "API settings saved!"; }} class="flex-grow bg-ge-accent text-ge-bg font-bold py-2 px-4 rounded text-xs hover:opacity-90 transition-all">
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
-      <div class="text-xs font-raleway font-bold text-ge-accent">Preview</div>
+      <div class="w-20"></div>
       
       <!-- Slide controls in the center -->
       <div class="flex items-center gap-2 text-xs">
@@ -902,22 +966,13 @@ isThinking = false;
       </div>
 
       <div class="flex gap-2">
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => window.print()}>Export PDF</button>
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
-          if (!slides.length) return;
-          const html = slides[currentSlideIndex].html;
-          const blob = new Blob([html], { type: 'text/html' });
-          const link = document.createElement('a');
-          link.download = `slide_${currentSlideIndex + 1}.html`;
-          link.href = URL.createObjectURL(blob);
-          link.click();
-          URL.revokeObjectURL(link.href);
-        }}>Export HTML</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportPdf}>Export PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportHtml}>Export HTML</button>
       </div>
     </div>
 
     <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
-      <div class="w-full h-full max-w-5xl bg-transparent rounded shadow-2xl border border-ge-border/30 overflow-hidden relative" style="aspect-ratio: 16/9;">
+      <div class="w-full h-full max-w-6xl bg-transparent rounded shadow-2xl border border-ge-border/30 overflow-hidden relative" style="aspect-ratio: 16/9;">
         <iframe
           bind:this={iframeElement}
           title="Slide Preview"

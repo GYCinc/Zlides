@@ -102,7 +102,7 @@ class CostEstimateRequest(BaseModel):
     prompt: str
     files_attached: int = 0
     format: str = "slides"
-    page_count: int = 5
+    page_count: int | None = 5
 
 @app.post("/estimate-cost")
 async def api_estimate_cost(req: CostEstimateRequest):
@@ -119,7 +119,7 @@ async def api_estimate_cost(req: CostEstimateRequest):
     elif req.format == "report":
         estimated_output_tokens = 4000
     else:  # slides or auto
-        estimated_output_tokens = req.page_count * 1600  # ~1.6k tokens per slide page
+        estimated_output_tokens = (req.page_count or 5) * 1600  # ~1.6k tokens per slide page
 
     cost_usd = estimate_cost(estimated_input_tokens, estimated_output_tokens)
     return {"cost_usd": cost_usd, "input_tokens": estimated_input_tokens, "output_tokens": estimated_output_tokens}
@@ -579,10 +579,12 @@ async def send_command(request: ChatRequest):
         language=request.language,
     )
 
-    # Page count instruction
-    page_instruction = ""
+    # Page count instruction — only constrain if user explicitly set one
     effective_page_count = request.page_count or 5
-    page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    if request.page_count:
+        page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    else:
+        page_instruction = ""
 
     user_text = request.message
     if request.system_prompt:
