@@ -13,6 +13,7 @@
   };
 
   import * as ChainOfThought from '$lib/components/ai-elements/chain-of-thought';
+  import SvelteVirtualChat from '@humanspeak/svelte-virtual-chat';
 
 
   let cost = 0.00;
@@ -28,7 +29,7 @@
   let slides: any[] = [];
   let currentSlideIndex = 0;
   // Included a mock RR button to prove the concept works when dropped in
-  let iframeSrcDoc = "<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#131313;color:#888;font-family:sans-serif;margin:0;'><div style='text-align:center;'><h3>Zlides V2 Preview</h3><p style='font-size:12px;color:#555;'>Your generated presentation will appear here.</p></div></body></html>";
+  let iframeSrcDoc = "<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#131313;color:#888;font-family:sans-serif;margin:0;'><div style='text-align:center;'><h3>Zlides Preview</h3><p style='font-size:12px;color:#555;'>Your generated presentation will appear here.</p></div></body></html>";
 
   let promptText = "";
   let files: FileList | null = null;
@@ -38,7 +39,7 @@
   onMount(async () => {
     if (typeof localStorage !== 'undefined') {
       customApiKey = localStorage.getItem('zlides_api_key') || '';
-      customBaseUrl = localStorage.getItem('zlides_base_url') || '';
+      customBaseUrl = localStorage.getItem('zlides_base_url') || 'https://api.z.ai/api/v1/agents';
     }
 
     // Load styles from the backend
@@ -157,7 +158,9 @@ let currentController: AbortController | null = null;
   let thinkingBuffer = '';
 
   // We'll define these fully in Step 3, but provide stubs to make TS happy
-  let chatMessages: any[] = [{ role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
+  let msgIdCounter = 0;
+  function nextId() { return `msg-${++msgIdCounter}`; }
+  let chatMessages: any[] = [{ id: nextId(), role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
   let selectedFormat = "slides";
   let selectedStyle = "auto";
   let pageCount: number | null = null;
@@ -165,6 +168,12 @@ let currentController: AbortController | null = null;
 
   let showStyleEditor = false;
   let showAdvancedColors = false;
+  let showPreferences = false;
+  let preferencesText = "";
+  let isEditMode = false;
+  let showRecent = false;
+  let recentSlides: any[] = [];
+  let chatViewport: any;
   let editingStyleId = "";
   let editingStyleName = "";
   let editingStylePromptHint = "";
@@ -313,6 +322,100 @@ let currentController: AbortController | null = null;
     URL.revokeObjectURL(link.href);
   }
 
+  async function openPreferences() {
+    try {
+      const resp = await fetch("/preferences");
+      const data = await resp.json();
+      preferencesText = data.content || "";
+      showPreferences = true;
+    } catch (e: any) {
+      preferencesText = "";
+      showPreferences = true;
+    }
+  }
+
+  async function savePreferences() {
+    try {
+      await fetch("/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: preferencesText })
+      });
+      showPreferences = false;
+    } catch (e: any) {
+      status = "Failed to save preferences";
+    }
+  }
+
+  async function loadRecent() {
+    try {
+      const resp = await fetch("/saved");
+      recentSlides = await resp.json();
+      showRecent = true;
+    } catch (e: any) {
+      recentSlides = [];
+      showRecent = true;
+    }
+  }
+
+  async function openRecentSlide(filename: string, title: string) {
+    try {
+      const resp = await fetch(`/saved/${filename}`);
+      const html = await resp.text();
+      iframeSrcDoc = html;
+      slides = [{ html, title }];
+      currentSlideIndex = 0;
+      showRecent = false;
+    } catch (e: any) {
+      status = "Failed to open slide";
+    }
+  }
+
+  $: if (isEditMode && iframeElement?.contentDocument?.body) {
+    iframeElement.contentDocument.body.contentEditable = 'true';
+    iframeElement.contentDocument.body.style.outline = '2px solid #ff6600';
+    iframeElement.contentDocument.body.style.outlineOffset = '-2px';
+  }
+
+  $: if (isGenerating && chatViewport) {
+    setTimeout(() => chatViewport?.scrollToBottom({ smooth: true }), 50);
+  }
+
+  function toggleEditMode() {
+    isEditMode = !isEditMode;
+    if (iframeElement?.contentDocument?.body) {
+      iframeElement.contentDocument.body.contentEditable = isEditMode ? 'true' : 'false';
+      if (isEditMode) {
+        iframeElement.contentDocument.body.style.outline = '2px solid #ff6600';
+        iframeElement.contentDocument.body.style.outlineOffset = '-2px';
+      } else {
+        iframeElement.contentDocument.body.style.outline = 'none';
+      }
+    }
+  }
+
+  function captureEdits() {
+    if (!iframeElement?.contentDocument) return;
+    const editedHtml = '<!DOCTYPE html>\n' + iframeElement.contentDocument.documentElement.outerHTML;
+    if (slides[currentSlideIndex]) {
+      slides[currentSlideIndex].html = editedHtml;
+      slides = [...slides];
+    }
+    isEditMode = false;
+    if (iframeElement.contentDocument.body) {
+      iframeElement.contentDocument.body.contentEditable = 'false';
+      iframeElement.contentDocument.body.style.outline = 'none';
+    }
+  }
+
+  function applyEditsEverywhere() {
+    if (!iframeElement?.contentDocument) return;
+    const editedHtml = '<!DOCTYPE html>\n' + iframeElement.contentDocument.documentElement.outerHTML;
+    captureEdits();
+    promptText = `I manually edited slide ${currentSlideIndex + 1}. Here is my edited version:\n\n<EDITED_SLIDE>\n${editedHtml}\n</EDITED_SLIDE>\n\nLook at the edits I made to this slide and apply the same style/layout changes to ALL other slides in the presentation. Maintain the same visual consistency.`;
+    status = "Edit captured — review prompt and hit send to apply everywhere";
+  }
+
 
   function extractImages(thought: string) {
     const images = [];
@@ -348,14 +451,7 @@ let currentController: AbortController | null = null;
   }
 
   function addMessage(text: string, role: string) {
-    chatMessages = [...chatMessages, { role, text }];
-    // Ensure scrolling happens after DOM update
-    setTimeout(() => {
-      const historyDiv = document.getElementById("chat-history");
-      if (historyDiv) {
-        historyDiv.scrollTop = historyDiv.scrollHeight;
-      }
-    }, 10);
+    chatMessages = [...chatMessages, { id: nextId(), role, text }];
   }
 
   function stopRequest() {
@@ -571,12 +667,13 @@ let currentController: AbortController | null = null;
                     thinkingBuffer = '';
                   }
 
-isThinking = false;
+                  isThinking = false;
 
                   const html = data.html;
                   iframeSrcDoc = html;
                   slides = [...slides, { html, title: textToSend }];
                   currentSlideIndex = slides.length - 1;
+                  addMessage('Done! Your slides are ready to view.', 'agent');
                   status = 'Done!';
 
                   isGenerating = false;
@@ -621,7 +718,13 @@ isThinking = false;
     <div class="space-y-1 flex-shrink-0">
       <div class="flex items-center gap-2 flex-wrap">
         <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway flex items-center gap-2">
-          Zlides V2
+          Zlides
+          <button on:click={loadRecent} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="Recent Files">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+          </button>
+          <button on:click={openPreferences} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="Preferences">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          </button>
           <button on:click={() => showApiSettings = true} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="API Settings">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
@@ -681,62 +784,78 @@ isThinking = false;
       </div>
     </div>
 
-    <!-- Chat History -->
-    <div id="chat-history" class="flex-grow overflow-y-auto overflow-x-hidden min-w-0 flex flex-col gap-2.5 p-3 bg-ge-bg/30 rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset">
-      {#each chatMessages as msg}
-        {#if msg.role !== 'thinking'}
-        <div class="p-2.5 rounded-lg max-w-[85%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm' : 'bg-ge-bg/55 text-ge-text-muted mr-auto border border-ge-border/30'}">
-          {#if msg.role !== 'user'}
-            <div class="text-[9px] font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
-          {/if}
-          {#if msg.role === 'agent' || msg.role === 'thinking'}
-            <div class="prose prose-invert prose-sm max-w-none text-ge-text-muted">
-              <SvelteMarkdown source={msg.text} extensions={[markedMermaid()]} {renderers} />
+    <!-- Chat + Input: one continuous surface -->
+    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset overflow-hidden">
+      <div class="flex-grow min-h-0">
+      <SvelteVirtualChat
+        bind:this={chatViewport}
+        messages={chatMessages}
+        getMessageId={(msg) => msg.id}
+        estimatedMessageHeight={80}
+        containerClass="h-full bg-ge-bg/30"
+        viewportClass="h-full px-3 py-2"
+      >
+        {#snippet renderMessage(msg)}
+          {#if msg.role !== 'thinking'}
+            <div class="p-2.5 rounded-lg max-w-[85%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm' : 'bg-ge-bg/55 text-ge-text-muted mr-auto border border-ge-border/30'}">
+              {#if msg.role !== 'user'}
+                <div class="text-[9px] font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
+              {/if}
+              {#if msg.role === 'agent' || msg.role === 'thinking'}
+                <div class="prose prose-invert prose-sm max-w-none text-ge-text-muted">
+                  <SvelteMarkdown source={msg.text} extensions={[markedMermaid()]} {renderers} />
+                </div>
+              {:else}
+                <div class="text-ge-text text-xs">{msg.text}</div>
+              {/if}
             </div>
-          {:else}
-            <div class="text-ge-text text-xs">{msg.text}</div>
           {/if}
-        </div>
-        {/if}
-      {/each}
+        {/snippet}
 
-      {#if thoughts.length > 0 || isThinking}
-        <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
-          <ChainOfThought.Root open={isThinking} defaultOpen={true}>
-            <ChainOfThought.Header />
-            <ChainOfThought.Content>
-              {#each thoughts as thought, i}
-                <ChainOfThought.Step
-                  label={stripImages(thought) || "Looking at image..."}
-                  status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
-                >
-                  {#each extractImages(thought) as img}
-                    <ChainOfThought.Image caption={img.alt}>
-                      <img src={img.url} alt={img.alt} class="w-full h-auto rounded" />
-                    </ChainOfThought.Image>
+        {#snippet footer()}
+          {#if thoughts.length > 0 || isThinking}
+            <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
+              <ChainOfThought.Root open={true} defaultOpen={true}>
+                <ChainOfThought.Header />
+                <ChainOfThought.Content>
+                  {#each thoughts as thought, i}
+                    <ChainOfThought.Step
+                      label={stripImages(thought) || "Looking at image..."}
+                      status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
+                    >
+                      {#each extractImages(thought) as img}
+                        <ChainOfThought.Image caption={img.alt}>
+                          <img src={img.url} alt={img.alt} class="w-full h-auto rounded" />
+                        </ChainOfThought.Image>
+                      {/each}
+                    </ChainOfThought.Step>
                   {/each}
-                </ChainOfThought.Step>
-              {/each}
 
-              {#if toolCalls.length > 0}
-                <ChainOfThought.SearchResults class="mt-2">
-                  {#each toolCalls as call}
-                    <ChainOfThought.SearchResult>{call.name}: {call.input.length > 20 ? call.input.substring(0,20)+'...' : call.input}</ChainOfThought.SearchResult>
-                  {/each}
-                </ChainOfThought.SearchResults>
-              {/if}
-              {#if isThinking && thoughts.length === 0}
+                  {#if toolCalls.length > 0}
+                    <ChainOfThought.SearchResults class="mt-2">
+                      {#each toolCalls as call}
+                        <ChainOfThought.SearchResult>{call.name}: {call.input.length > 20 ? call.input.substring(0,20)+'...' : call.input}</ChainOfThought.SearchResult>
+                      {/each}
+                    </ChainOfThought.SearchResults>
+                  {/if}
+                  {#if isThinking && thoughts.length === 0}
+                    <ChainOfThought.Step label="Initializing thought process..." status="active" />
+                  {/if}
+                  {#if isGenerating && !isThinking}
+                    <div class="flex items-center gap-2 text-ge-text-muted text-xs py-2">
+                      <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
+                      <span>Generating slides...</span>
+                    </div>
+                  {/if}
+                </ChainOfThought.Content>
+              </ChainOfThought.Root>
+            </div>
+          {/if}
+        {/snippet}
+      </SvelteVirtualChat>
+      </div>
 
-                 <ChainOfThought.Step label="Initializing thought process..." status="active" />
-              {/if}
-            </ChainOfThought.Content>
-          </ChainOfThought.Root>
-        </div>
-      {/if}
-    </div>
-
-    <div class="flex flex-col gap-2 flex-shrink-0">
-      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset relative min-h-[140px] flex-shrink-0">
+      <div class="flex flex-col bg-ge-bg/30 border-t border-ge-border/30 p-2.5 relative min-h-[140px] flex-shrink-0">
         <textarea
           bind:value={promptText}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
@@ -783,6 +902,8 @@ isThinking = false;
             </div>
         </div>
       </div>
+    </div>
+
       {#if showStyleEditor}
         <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-20 overflow-y-auto border-r border-ge-border">
           <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
@@ -924,7 +1045,7 @@ isThinking = false;
 
             <div class="flex flex-col gap-1">
               <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Base URL</label>
-              <input type="text" bind:value={customBaseUrl} placeholder="https://api.z.ai" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent" />
+              <input type="text" bind:value={customBaseUrl} class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent font-mono text-[11px]" />
             </div>
 
             <div class="flex gap-2 mt-auto pt-4 border-t border-ge-border">
@@ -935,8 +1056,47 @@ isThinking = false;
           </div>
         </div>
       {/if}
+
+      {#if showPreferences}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-30 overflow-y-auto border-r border-ge-border">
+          <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">Preferences</h2>
+            <button on:click={() => showPreferences = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+          </div>
+          <p class="text-[10px] text-ge-text-muted mb-2">These preferences are injected into every generation. Write anything you want the agent to always follow — fonts, spacing, tone, structure, etc.</p>
+          <textarea bind:value={preferencesText} rows="20" placeholder="# My Preferences&#10;&#10;- Always use generous padding (at least 40px)&#10;- Keep font sizes large and readable&#10;- Use card-based layouts&#10;- Short paragraphs, bullet points preferred&#10;- Add subtle hover effects on interactive elements" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text resize-y focus:border-ge-accent font-mono text-[11px] flex-grow"></textarea>
+          <button on:click={savePreferences} class="mt-3 bg-ge-accent text-ge-bg font-bold py-2 px-4 rounded text-xs hover:opacity-90 transition-all">Save Preferences</button>
+        </div>
+      {/if}
+
+      {#if showRecent}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-30 overflow-y-auto border-r border-ge-border">
+          <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">Recent Files</h2>
+            <button on:click={() => showRecent = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+          </div>
+          {#if recentSlides.length === 0}
+            <p class="text-ge-text-muted text-xs">No saved slides yet.</p>
+          {:else}
+            <div class="flex flex-col gap-1.5 flex-grow">
+              {#each recentSlides as slide}
+                <button
+                  on:click={() => openRecentSlide(slide.filename, slide.title)}
+                  class="text-left bg-ge-bg border border-ge-border rounded p-2.5 hover:border-ge-accent transition-colors group"
+                >
+                  <div class="text-xs font-bold text-ge-text group-hover:text-ge-accent truncate">{slide.title}</div>
+                  <div class="text-[9px] text-ge-text-muted mt-0.5 flex items-center gap-2">
+                    <span>{slide.date}</span>
+                    <span>·</span>
+                    <span>{(slide.size / 1024).toFixed(0)}KB</span>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
-  </div>
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
@@ -965,9 +1125,16 @@ isThinking = false;
         </button>
       </div>
 
-      <div class="flex gap-2">
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportPdf}>Export PDF</button>
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportHtml}>Export HTML</button>
+      <div class="flex gap-2 items-center">
+        {#if slides.length > 0}
+          {#if isEditMode}
+            <button class="text-xs px-2 py-1 bg-ge-success/20 border border-ge-success text-ge-success rounded hover:bg-ge-success/30 transition-colors" on:click={captureEdits} title="Save edits to this slide">Save Edits</button>
+            <button class="text-xs px-2 py-1 bg-ge-accent/20 border border-ge-accent text-ge-accent rounded hover:bg-ge-accent/30 transition-colors" on:click={applyEditsEverywhere} title="Send edited slide to agent to replicate across all slides">Apply Everywhere</button>
+          {/if}
+          <button class="text-xs px-2 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={toggleEditMode} title="Toggle inline editing">{isEditMode ? 'Exit Edit' : 'Edit'}</button>
+        {/if}
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportPdf}>PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportHtml}>HTML</button>
       </div>
     </div>
 

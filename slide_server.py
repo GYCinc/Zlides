@@ -16,12 +16,13 @@ load_dotenv()
 
 VERSION = "0.2.0"
 Z_AI_API_KEY = os.getenv("Z_AI_API_KEY")
-ZAI_ENDPOINT = "https://api.z.ai/api/v1/agents"
-ZAI_FILES_ENDPOINT = "https://api.z.ai/api/paas/v4/files"
+ZAI_ENDPOINT = os.getenv("Z_AI_ENDPOINT", "https://api.z.ai/api/v1/agents")
+ZAI_FILES_ENDPOINT = os.getenv("Z_AI_FILES_ENDPOINT", "https://api.z.ai/api/paas/v4/files")
 SAVED_SLIDES_DIR = "saved_slides"
 SESSION_FILE = "session.json"
 STYLE_BANK_DIR = Path("style_bank")
 ASSETS_DIR = Path("assets")
+PREFERENCES_FILE = Path("PREFERENCES.md")
 
 os.makedirs(SAVED_SLIDES_DIR, exist_ok=True)
 os.makedirs(STYLE_BANK_DIR, exist_ok=True)
@@ -125,6 +126,16 @@ async def api_estimate_cost(req: CostEstimateRequest):
     return {"cost_usd": cost_usd, "input_tokens": estimated_input_tokens, "output_tokens": estimated_output_tokens}
 
 
+def load_preferences() -> str:
+    """Load PREFERENCES.md if it exists — injected into every system prompt."""
+    try:
+        if PREFERENCES_FILE.exists():
+            return PREFERENCES_FILE.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def load_style_bank():
     """Load all style packs from style_bank/ directory."""
     styles = {}
@@ -144,6 +155,10 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
 
     # GLM slides agent already knows how to create slides - just guide the format
     base = f"Create a {fmt} (HTML format).\n\n{format_instruction}"
+
+    prefs = load_preferences()
+    if prefs:
+        base += f"\n\n--- USER PREFERENCES (follow these closely) ---\n{prefs}"
 
     # Load style hint if specified
     if style_id and style_id != "auto":
@@ -419,6 +434,8 @@ class ChatRequest(BaseModel):
     web_search: bool = True
     format: str = "slides"
     style: str = "auto"
+    api_key: str = ""
+    base_url: str = ""
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -513,6 +530,21 @@ async def delete_style(style_id: str):
     return {"deleted": True, "id": style_id}
 
 
+@app.get("/preferences")
+async def get_preferences():
+    content = load_preferences()
+    if not content:
+        content = "# My Preferences\n\n<!-- Write your style/layout/content preferences here. These get injected into every generation. -->\n<!-- Example: Always use sans-serif fonts. Keep paragraphs short. Use generous padding. -->"
+    return {"content": content}
+
+
+@app.post("/preferences")
+async def save_preferences(request: dict):
+    content = request.get("content", "")
+    PREFERENCES_FILE.write_text(content, encoding="utf-8")
+    return {"saved": True}
+
+
 # ── Export Endpoints ─────────────────────────────────────────────────────────
 
 
@@ -566,8 +598,11 @@ async def get_saved_slide(filename: str):
 
 @app.post("/command")
 async def send_command(request: ChatRequest):
+    effective_api_key = request.api_key or Z_AI_API_KEY
+    effective_endpoint = request.base_url or ZAI_ENDPOINT
+
     headers = {
-        "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+        "Authorization": f"Bearer {generate_token(effective_api_key)}",
         "Content-Type": "application/json",
         "Accept-Language": "en-US,en",
     }
@@ -667,9 +702,9 @@ async def send_command(request: ChatRequest):
     )
 
     async def generate():
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=600.0) as client:
             async with client.stream(
-                "POST", ZAI_ENDPOINT, json=payload, headers=headers
+                "POST", effective_endpoint, json=payload, headers=headers
             ) as response:
                 if response.status_code != 200:
                     yield f"data: {json.dumps({'type': 'error', 'text': f'Z.AI API Error: {response.status_code}'})}\n\n"
@@ -933,6 +968,170 @@ async def send_command(request: ChatRequest):
 
 
 # ── Async & Export ────────────────────────────────────────────────────────────
+
+@app.post("/api/print")
+async def printing_press(request: ChatRequest):
+    """One-shot 'printing press' — takes content, returns designed HTML.
+
+    No conversation state, no multi-turn, no SSE stream.
+    Perfect for external agents to send content and get a designed result.
+    """
+    effective_api_key = request.api_key or Z_AI_API_KEY
+    effective_endpoint = request.base_url or ZAI_ENDPOINT
+
+    headers = {
+        "Authorization": f"Bearer {generate_token(effective_api_key)}",
+        "Content-Type": "application/json",
+        "Accept-Language": "en-US,en",
+    }
+
+    fmt = request.format or request.slide_type or "report"
+    system_prompt = build_system_prompt(
+        fmt=fmt,
+        style_id=request.style or request.theme or "auto",
+        language=request.language,
+    )
+
+    one_shot = (
+        "\n\nONE-SHOT MODE: You cannot ask questions or clarify. "
+        "Take the content provided and design it as best you can. "
+        "When in doubt about the content, preserve it as-is. "
+        "Focus on layout, typography, and visual polish."
+    )
+
+    full_prompt = f"{system_prompt}{one_shot}\n\nCONTENT TO DESIGN:\n{request.message}"
+    messages = [{"role": "user", "content": [{"type": "text", "text": full_prompt}]}]
+
+    payload = {
+        "agent_id": "slides_glm_agent",
+        "stream": True,
+        "messages": messages,
+        "enable_thinking": False,
+        "max_tokens": 65000,
+        "ctrl_step": 0.7,
+        "extra_body": {
+            "cache_salt": __import__("secrets").token_urlsafe(32),
+            "thinking": {"type": "disabled", "clear_thinking": True},
+            "tool_stream": True,
+        },
+        "response_format": {"type": "json_object"},
+        "requestId": str(__import__("uuid").uuid4()),
+    }
+
+    async with httpx.AsyncClient(timeout=600.0) as client:
+        async with client.stream(
+            "POST", effective_endpoint, json=payload, headers=headers
+        ) as response:
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Z.AI API Error: {response.status_code}",
+                )
+
+            all_chunks = []
+            answer_texts = []
+            tool_html_pages = []
+            last_valid_chunk = {}
+
+            async for line in response.aiter_lines():
+                if not line.strip() or not line.startswith("data:"):
+                    continue
+                line_data = line[5:].strip()
+                if line_data == "[DONE]":
+                    continue
+                try:
+                    chunk = json.loads(line_data)
+                    if not isinstance(chunk, dict):
+                        continue
+                    all_chunks.append(chunk)
+
+                    if chunk.get("status") == "failed":
+                        raise HTTPException(status_code=502, detail="Z.AI agent failed")
+
+                    choices = chunk.get("choices", [])
+                    if choices and isinstance(choices, list) and choices:
+                        last_valid_chunk = chunk
+                        choice = choices[0]
+                        if not isinstance(choice, dict):
+                            continue
+                        msgs = choice.get("messages", [])
+                        if not msgs:
+                            single_msg = choice.get("message")
+                            if single_msg:
+                                msgs = single_msg if isinstance(single_msg, list) else [single_msg]
+
+                        for msg in msgs:
+                            if not isinstance(msg, dict):
+                                continue
+                            phase = msg.get("phase", "thinking")
+                            content = msg.get("content", [])
+                            content_items = [content] if isinstance(content, dict) else (content if isinstance(content, list) else [])
+
+                            for item in content_items:
+                                if not isinstance(item, dict):
+                                    continue
+                                item_type = item.get("type", "")
+
+                                if item_type == "object":
+                                    obj = item.get("object", {})
+                                    if isinstance(obj, dict):
+                                        tool_name = obj.get("tool_name", "")
+                                        output = obj.get("output", "")
+                                        position = obj.get("position", [])
+                                        if tool_name in ["insert_page", "add_slide", "add_page", "insert_slide",
+                                                          "modify_page", "update_slide", "update_page", "modify_slide", "replace_slide"]:
+                                            if output and isinstance(output, str) and len(output) > 10:
+                                                output = output.replace("\\n", "\n").replace('\\"', '"')
+                                                tool_html_pages.append({"tool": tool_name, "html": output, "position": position})
+                                    continue
+
+                                if item_type == "text":
+                                    text_content = item.get("text", "")
+                                    if text_content and phase == "answer" and len(text_content) > 50:
+                                        answer_texts.append(text_content)
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+
+    # ── Build final HTML (same pipeline as /command) ──
+    slide_html = ""
+    if tool_html_pages:
+        slide_html = combine_tool_pages(tool_html_pages)
+    if not slide_html and last_valid_chunk:
+        slide_html = extract_final_html(last_valid_chunk)
+    if not slide_html and answer_texts:
+        slide_html = clean_agent_output("\n".join(answer_texts))
+    if not slide_html:
+        for c in reversed(all_chunks):
+            slide_html = extract_final_html(c)
+            if slide_html:
+                break
+    if not slide_html or len(slide_html) < 50:
+        plain = " ".join(answer_texts) if answer_texts else ""
+        slide_html = wrap_in_slide_html(plain or "No content generated.", request.message)
+
+    if slide_html:
+        slide_html = slide_html.replace("\\n", "\n").replace('\\"', '"')
+
+    # Inject style CSS
+    style_id = request.style or request.theme or "auto"
+    if style_id and style_id != "auto":
+        styles = load_style_bank()
+        sp = styles.get(style_id)
+        if sp and sp.get("css"):
+            css_vars = "\n".join([f"      --zlides-{k}: {v};" for k, v in sp["css"].items()])
+            css_injection = f"\n<style>\n:root {{\n{css_vars}\n}}\n</style>\n"
+            if "</head>" in slide_html:
+                slide_html = slide_html.replace("</head>", f"{css_injection}</head>")
+            else:
+                slide_html = f"{css_injection}\n" + slide_html
+
+    filepath = save_slide_to_file(slide_html, request.message)
+    title = request.message[:60]
+
+    return {"html": slide_html, "filename": filepath, "title": title}
+
 
 @app.post("/async")
 async def async_generate(request: ChatRequest):

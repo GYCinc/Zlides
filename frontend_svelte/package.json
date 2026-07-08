@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@humanspeak/svelte-markdown": "^1.6.0",
+    "@humanspeak/svelte-virtual-chat": "^0.1.16",
     "@tailwindcss/typography": "^0.5.20",
     "clsx": "^2.1.1",
     "lucide-svelte": "^1.0.1",
