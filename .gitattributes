@@ -1,0 +1,8 @@
+# Don't count compiled frontend output as source code
+public/assets/*.js linguist-generated
+public/assets/*.css linguist-generated
+public/index.html linguist-generated
+
+# Lockfiles
+uv.lock linguist-generated
+frontend_svelte/bun.lock linguist-generated
