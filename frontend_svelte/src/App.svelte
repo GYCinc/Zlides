@@ -133,6 +133,8 @@
             }
           ];
           selectedStyle = data.style_extracted.id;
+        } else if (uploadMode === "reference") {
+          status = "Reference attached. Write your own prompt to create.";
         } else {
           status = "File parsed into Markdown. Ready to generate.";
         }
@@ -301,14 +303,30 @@ let currentController: AbortController | null = null;
     }
   }
 
-  function exportPdf() {
+  async function exportPdf(branded = false) {
     if (!slides.length) return;
-    const html = slides[currentSlideIndex].html;
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 400);
+    status = branded ? "Generating branded PDF..." : "Generating print-friendly PDF...";
+    try {
+      const html = slides[currentSlideIndex].html;
+      const resp = await fetch("/export/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html, print_mode: branded ? "branded" : "light" }),
+      });
+      if (!resp.ok) {
+        throw new Error(await resp.text());
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `slide_${currentSlideIndex + 1}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      status = "PDF exported!";
+    } catch (e: any) {
+      status = "PDF export failed: " + e.message;
+    }
   }
 
   function exportHtml() {
@@ -785,7 +803,7 @@ isThinking = false;
     </div>
 
     <!-- Chat + Input: one continuous surface -->
-    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset overflow-hidden">
+    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm overflow-hidden">
       <div class="flex-grow min-h-0">
       <SvelteVirtualChat
         bind:this={chatViewport}
@@ -878,6 +896,7 @@ isThinking = false;
              <select bind:value={uploadMode} class="bg-ge-card border border-ge-border rounded px-1.5 py-0.5 text-[10px] text-ge-text-muted outline-none focus:border-ge-accent cursor-pointer h-7 select-none">
                <option value="content" class="bg-ge-card text-ge-text">Remake Content</option>
                <option value="style" class="bg-ge-card text-ge-text">Harvest Style</option>
+               <option value="reference" class="bg-ge-card text-ge-text">Reference</option>
              </select>
            </div>
 
@@ -1133,7 +1152,8 @@ isThinking = false;
           {/if}
           <button class="text-xs px-2 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={toggleEditMode} title="Toggle inline editing">{isEditMode ? 'Exit Edit' : 'Edit'}</button>
         {/if}
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportPdf}>PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => exportPdf(false)} title="Export print-friendly PDF (light)">PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => exportPdf(true)} title="Export branded PDF (keeps dark colors)">PDF (Dark)</button>
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportHtml}>HTML</button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import httpx
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +11,13 @@ import jwt
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+from io import BytesIO
+
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
 
 load_dotenv()
 
@@ -22,6 +29,7 @@ SAVED_SLIDES_DIR = "saved_slides"
 SESSION_FILE = "session.json"
 STYLE_BANK_DIR = Path("style_bank")
 ASSETS_DIR = Path("assets")
+FONT_DIR = ASSETS_DIR / "fonts"
 PREFERENCES_FILE = Path("PREFERENCES.md")
 
 os.makedirs(SAVED_SLIDES_DIR, exist_ok=True)
@@ -60,6 +68,49 @@ FORMATS = {
     "report": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.",
     "rr": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants. Add inline styles for .regenerate-btn.",
 }
+
+# Universal print CSS — class-agnostic so it works regardless of AI-generated class names
+UNIVERSAL_PRINT_LIGHT = """<style>@media print {
+  @page { size: A4; margin: 1.5cm; }
+  * {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #cccccc !important;
+  }
+  a { color: #cc5500 !important; }
+  section, .slide, [class*="card"], [class*="slide"], [class*="section"] {
+    page-break-inside: avoid;
+  }
+}</style>"""
+
+UNIVERSAL_PRINT_BRANDED = """<style>@media print {
+  @page { size: A4; margin: 1.5cm; }
+  section, .slide, [class*="card"], [class*="slide"], [class*="section"] {
+    page-break-inside: avoid;
+  }
+}</style>"""
+
+PRINT_PROMPT_INSTRUCTIONS = (
+    "\n\n--- PRINT-FRIENDLY OUTPUT RULES ---\n"
+    "Your HTML will be printed and exported to PDF. Follow these rules:\n"
+    "- Use page-break-inside: avoid on cards, sections, and self-contained content blocks.\n"
+    "- Avoid fixed pixel heights on containers that should grow with content.\n"
+    "- Prefer relative units (em, %, vh) over large fixed pixel dimensions.\n"
+    "- Ensure text remains readable if backgrounds are removed (sufficient contrast).\n"
+)
+
+def inject_print_css(html: str, light: bool = True) -> str:
+    """Inject universal print CSS before </head> (or before first </style> as fallback).
+    Uses count=1 to prevent duplicate injection on multi-slide documents."""
+    css = UNIVERSAL_PRINT_LIGHT if light else UNIVERSAL_PRINT_BRANDED
+    if "</head>" in html:
+        return html.replace("</head>", f"\n{css}\n</head>", 1)
+    elif "</style>" in html:
+        return html.replace("</style>", f"</style>\n{css}", 1)
+    else:
+        return html + css
 
 
 
@@ -148,6 +199,67 @@ def load_style_bank():
     return styles
 
 
+def embed_style_fonts(html: str, style_pack) -> str:
+    """Make a generated HTML doc font-self-contained for a style pack.
+
+    1. Strip any external font @import / <link> (Google Fonts etc.) so the doc
+       never fetches from a host that may not resolve.
+    2. For each font named (first quoted family) in the pack's `fonts` that has
+       a local .woff2 at assets/fonts/<family>-<weight>.woff2, inject a base64
+       @font-face so the document renders fully offline.
+    """
+    import base64 as _b64
+    import re as _re
+
+    if not html:
+        return html
+
+    # 1. Strip external font imports / links (googleapis + known font CDNs)
+    html = _re.sub(
+        r"@import\s+url\(\s*['\"]?https?://[^)]*(?:fonts\.googleapis|fonts\.gstatic|fonts\.bunny|fontsource|use\.typekit)[^)]*\)\s*[^;]*;?",
+        "",
+        html,
+        flags=_re.IGNORECASE,
+    )
+    html = _re.sub(
+        r"<link\b[^>]*(?:fonts\.googleapis|fonts\.gstatic|fonts\.bunny)[^>]*>",
+        "",
+        html,
+        flags=_re.IGNORECASE,
+    )
+
+    # 2. Build embedded @font-face blocks for fonts that have local .woff2
+    fonts = (style_pack or {}).get("fonts", {})
+    face_blocks = []
+    for role in ("heading", "body"):
+        stack = fonts.get(role, "")
+        if not stack:
+            continue
+        m = _re.search(r"['\"]([^'\"]+)['\"]", stack)  # first quoted family name
+        if not m:
+            continue
+        family = m.group(1)
+        for woff2 in sorted(FONT_DIR.glob(f"{family.lower()}-*.woff2")):
+            wm = _re.search(r"-(\d{3})$", woff2.stem)
+            weight = wm.group(1) if wm else "400"
+            b64 = _b64.b64encode(woff2.read_bytes()).decode("ascii")
+            face_blocks.append(
+                f"@font-face{{font-family:'{family}';font-weight:{weight};"
+                f"font-style:normal;font-display:swap;"
+                f"src:url(data:font/woff2;base64,{b64}) format('woff2');}}"
+            )
+
+    if not face_blocks:
+        return html
+
+    injection = "\n<style>\n" + "\n".join(face_blocks) + "\n</style>\n"
+    if "</head>" in html:
+        return html.replace("</head>", f"{injection}</head>", 1)
+    if "<style>" in html:
+        return html.replace("<style>", f"{injection}\n<style>", 1)
+    return injection + html
+
+
 def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
     """Build the system prompt from format + style selections."""
 
@@ -174,6 +286,8 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
                 base += "You must explicitly use these exact hex colors in your inline CSS styling:\n"
                 for k, v in css.items():
                     base += f"- {k}: {v}\n"
+
+    base += PRINT_PROMPT_INSTRUCTIONS
 
     return base
 
@@ -548,6 +662,44 @@ async def save_preferences(request: dict):
 # ── Export Endpoints ─────────────────────────────────────────────────────────
 
 
+async def html_to_pdf(html: str, options: dict | None = None) -> bytes:
+    """Convert an HTML string to a PDF using Playwright + headless Chromium."""
+    if not PLAYWRIGHT_AVAILABLE:
+        raise RuntimeError(
+            "Playwright is not installed. Run: uv pip install playwright && playwright install chromium"
+        )
+
+    opts = options or {}
+    format_size = opts.get("format", "A4")
+    landscape = opts.get("landscape", False)
+    margin = opts.get(
+        "margin",
+        {"top": "0.4in", "right": "0.4in", "bottom": "0.4in", "left": "0.4in"},
+    )
+    print_background = opts.get("print_background", True)
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.set_content(html, wait_until="load")
+            pdf_bytes = await page.pdf(
+                format=format_size,
+                landscape=landscape,
+                margin=margin,
+                print_background=print_background,
+            )
+            return pdf_bytes
+        finally:
+            await browser.close()
+
+
+class PdfExportRequest(BaseModel):
+    html: str
+    options: dict | None = None
+    print_mode: str | None = None  # "light" (default) or "branded"
+
+
 @app.post("/export/html")
 async def export_html(request: dict):
     """Return full HTML document for download."""
@@ -555,6 +707,38 @@ async def export_html(request: dict):
     if not html:
         raise HTTPException(status_code=400, detail="No HTML provided")
     return JSONResponse(content={"html": html})
+
+
+@app.post("/export/pdf")
+async def export_pdf(request: PdfExportRequest):
+    """Convert provided HTML to a downloadable PDF document using Playwright."""
+    if not request.html:
+        raise HTTPException(status_code=400, detail="No HTML provided")
+
+    html = request.html
+    mode = request.print_mode or "light"
+
+    if mode == "branded":
+        # Strip light-mode print CSS and replace with branded-mode (pagination only)
+        html = html.replace(UNIVERSAL_PRINT_LIGHT, UNIVERSAL_PRINT_BRANDED)
+    else:
+        # Ensure light-mode print CSS is present
+        if UNIVERSAL_PRINT_LIGHT not in html:
+            html = inject_print_css(html, light=True)
+
+    try:
+        pdf_bytes = await html_to_pdf(html, request.options or {})
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+    filename = f"slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Saved Slides Endpoints ──────────────────────────────────────────────────
@@ -938,19 +1122,12 @@ async def send_command(request: ChatRequest):
                             else:
                                 slide_html = f"{css_injection}\n" + slide_html
 
-                    # Append print CSS from style bank if applicable
+                    # Inject universal print CSS (light mode by default for Ctrl+P)
+                    slide_html = inject_print_css(slide_html, light=True)
+
+                    # Embed local fonts + strip external font imports (self-contained)
                     if style_id and style_id != "auto":
-                        sp = styles.get(style_id)
-                        if sp and sp.get("print_css"):
-                            print_css = sp["print_css"]
-                            if "</head>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</head>", f"<style>{print_css}</style>\n</head>"
-                                )
-                            elif "</style>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</style>", f"\n{print_css}\n</style>"
-                                )
+                        slide_html = embed_style_fonts(slide_html, styles.get(style_id))
 
                     filepath = save_slide_to_file(slide_html, request.message)
 
@@ -1127,6 +1304,12 @@ async def printing_press(request: ChatRequest):
             else:
                 slide_html = f"{css_injection}\n" + slide_html
 
+        # Embed local fonts + strip external font imports (self-contained doc)
+        slide_html = embed_style_fonts(slide_html, sp)
+
+    # Inject universal print CSS (light mode by default)
+    slide_html = inject_print_css(slide_html, light=True)
+
     filepath = save_slide_to_file(slide_html, request.message)
     title = request.message[:60]
 
@@ -1285,6 +1468,10 @@ async def upload_file(file: UploadFile = File(...), type: str = Form("file")):
         # Append to style bank
         with open(STYLE_BANK_DIR / f"{style_extracted['id']}.json", "w") as sf:
             json.dump(style_extracted, sf)
+    elif "reference" in type.lower() or "neutral" in type.lower():
+        # Neutral reference: parse content but don't force a remake — just make it available
+        parsed_data = file_parser.parse_pdf(content, file.filename, tier="prime")
+        parsed_markdown = parsed_data.get("markdown", "")
     else:
         # Content Ingestion: Parse document text/layout to remake into slides
         parsed_data = file_parser.parse_pdf(content, file.filename, tier="prime")

@@ -8,6 +8,7 @@ dependencies = [
     "httpx>=0.28.1",
 
     "pydantic>=2.12.5",
+    "playwright>=1.40.0",
     "pyjwt>=2.8.0",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.22",
@@ -20,3 +21,6 @@ dependencies = [
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
