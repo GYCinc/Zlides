@@ -72,12 +72,19 @@ FORMATS = {
 # Universal print CSS — class-agnostic so it works regardless of AI-generated class names
 UNIVERSAL_PRINT_LIGHT = """<style>@media print {
   @page { size: A4; margin: 1.5cm; }
-  * {
+  *, *::before, *::after {
     background: #ffffff !important;
     color: #1a1a1a !important;
     box-shadow: none !important;
     text-shadow: none !important;
     border-color: #cccccc !important;
+    overflow: visible !important;
+    max-height: none !important;
+    float: none !important;
+  }
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
   }
   a { color: #cc5500 !important; }
   section, .slide, [class*="card"], [class*="slide"], [class*="section"] {
@@ -87,6 +94,15 @@ UNIVERSAL_PRINT_LIGHT = """<style>@media print {
 
 UNIVERSAL_PRINT_BRANDED = """<style>@media print {
   @page { size: A4; margin: 1.5cm; }
+  *, *::before, *::after {
+    overflow: visible !important;
+    max-height: none !important;
+    float: none !important;
+  }
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
   section, .slide, [class*="card"], [class*="slide"], [class*="section"] {
     page-break-inside: avoid;
   }
