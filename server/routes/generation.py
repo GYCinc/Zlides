@@ -33,10 +33,9 @@ class CostEstimateRequest(BaseModel):
     page_count: int | None = None
 
 def estimate_cost(input_tokens: int, output_tokens: int) -> float:
-    # 100 RMB per 1M tokens -> ~$14 USD per 1M tokens. 
-    # 2.5x agent overhead multiplier = $35 per 1M tokens total.
-    cost_usd = ((input_tokens + output_tokens) / 1_000_000) * 35.0
-    return round(cost_usd, 4)
+    # Based on user confirmed real pricing: $0.70 USD per 1M tokens in/out
+    cost_usd = ((input_tokens + output_tokens) / 1_000_000) * 0.70
+    return round(cost_usd, 5)
 
 def get_git_version():
     try:
