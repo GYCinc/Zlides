@@ -26,6 +26,10 @@ class ChatRequest(BaseModel):
 
 class BatchRequest(BaseModel):
     prompts: list[str]
+    format: str = "slides"
+    style: str = "auto"
+    role: str = "balanced"
+    page_count: int | None = None
 
 def clean_agent_output(raw: str) -> str:
     """Clean the raw agent output — strip code fences, extract HTML."""
@@ -210,9 +214,17 @@ class BatchSlideGenerator:
         self.semaphore = asyncio.Semaphore(max_concurrent)
 
     async def _generate_one(self, payload: dict) -> dict:
+        import httpx
         async with self.semaphore:
-            await asyncio.sleep(2)
-            return {"status": "completed", "prompt": payload.get("prompt")}
+            try:
+                # We call our own local /api/print endpoint so it handles all styling and file saving
+                async with httpx.AsyncClient(timeout=300.0) as client:
+                    resp = await client.post("http://127.0.0.1:2828/api/print", json=payload)
+                    if resp.status_code == 200:
+                        return {"status": "completed", "prompt": payload.get("message"), "file": resp.json().get("filename")}
+                    return {"status": "error", "prompt": payload.get("message"), "error": resp.text}
+            except Exception as e:
+                return {"status": "error", "prompt": payload.get("message"), "error": str(e)}
 
     async def generate_topic_batch(self, topics: list[dict]) -> list[dict]:
         tasks = [

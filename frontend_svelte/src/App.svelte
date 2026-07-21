@@ -109,7 +109,8 @@
     pageCount;
     updateCost();
   });
-  let isBatchMode = $derived(promptText.trim().startsWith("/batch"));
+  let forceBatchMode = $state(false);
+  let isBatchMode = $derived(forceBatchMode || promptText.trim().startsWith("/batch"));
 
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -736,7 +737,13 @@
         const res = await fetch("/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompts })
+          body: JSON.stringify({ 
+            prompts, 
+            format: apiFormat,
+            style: apiStyle,
+            role: selectedRole,
+            page_count: pageCount || undefined
+          })
         });
         const data = await res.json();
         status = `Batch completed! ${data.results.length} processed.`;
@@ -1228,6 +1235,11 @@ isThinking = false;
                <span class="text-[10px] text-ge-text-muted font-bold select-none uppercase tracking-wider font-mono">Pages:</span>
                <input type="number" bind:value={pageCount} min="1" max="20" placeholder="Auto" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-12 text-[11px] font-semibold text-center placeholder:text-ge-text-muted/65 p-0" title="Number of Pages">
              </div>
+
+             <label class="flex items-center gap-1.5 bg-ge-card border border-ge-border rounded px-2 h-7 cursor-pointer hover:bg-ge-border/50 transition-colors">
+               <input type="checkbox" bind:checked={forceBatchMode} class="w-3 h-3 accent-ge-accent bg-transparent border-ge-border cursor-pointer">
+               <span class="text-[10px] text-ge-text-muted font-bold select-none uppercase tracking-wider font-mono">Batch</span>
+             </label>
            </div>
 
             <div class="flex items-center justify-end gap-2 pointer-events-auto shrink-0 min-w-0">

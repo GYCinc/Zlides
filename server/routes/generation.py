@@ -33,8 +33,10 @@ class CostEstimateRequest(BaseModel):
     page_count: int | None = None
 
 def estimate_cost(input_tokens: int, output_tokens: int) -> float:
-    cost_usd = (output_tokens / 1_000_000) * 0.007
-    return round(cost_usd, 6)
+    # 100 RMB per 1M tokens -> ~$14 USD per 1M tokens. 
+    # 2.5x agent overhead multiplier = $35 per 1M tokens total.
+    cost_usd = ((input_tokens + output_tokens) / 1_000_000) * 35.0
+    return round(cost_usd, 4)
 
 def get_git_version():
     try:
@@ -94,9 +96,17 @@ async def estimate_cost_endpoint(req: CostEstimateRequest):
 @router.post("/batch")
 async def process_batch(req: BatchRequest):
     """Queue multiple generation requests"""
-    topics = [{"prompt": p} for p in req.prompts]
-    results = await batch_generator.generate_topic_batch(topics)
-    return {"results": results, "status": "batch_completed"}
+    topics = [{
+        "message": p, 
+        "format": req.format, 
+        "style": req.style, 
+        "role": req.role,
+        "page_count": req.page_count
+    } for p in req.prompts]
+    
+    # Run the batch generator in the background so we don't block the HTTP request
+    asyncio.create_task(batch_generator.generate_topic_batch(topics))
+    return {"status": "batch_started", "message": f"Queued {len(topics)} generations in the background."}
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), type: str = Form("file")):
