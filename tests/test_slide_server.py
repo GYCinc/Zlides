@@ -39,7 +39,32 @@ def test_export_pdf_generates_pdf():
 
 def test_export_pdf_without_playwright_returns_503(monkeypatch):
     # Force the availability flag to False so the endpoint returns a 503.
-    monkeypatch.setattr("slide_server.PLAYWRIGHT_AVAILABLE", False)
+    monkeypatch.setattr("server.core.export.PLAYWRIGHT_AVAILABLE", False)
     response = client.post("/export/pdf", json={"html": SAMPLE_HTML})
     assert response.status_code == 503
     assert "Playwright is not installed" in response.text
+
+
+def test_generate_token_signature():
+    from slide_server import generate_token
+    # Test that it works with default exp_seconds
+    token_default = generate_token("testkey.testsecret")
+    assert token_default is not None
+
+    # Test that it accepts exp_seconds as keyword argument
+    token_custom = generate_token("testkey.testsecret", exp_seconds=3600)
+    assert token_custom is not None
+
+
+def test_sanitize_html():
+    from slide_server import sanitize_html
+    dirty_html = (
+        "<html><head><script>alert('xss')</script></head>"
+        "<body><button onclick=\"doSomething()\" onload=bad() class=\"btn\">Click</button></body></html>"
+    )
+    clean = sanitize_html(dirty_html)
+    assert "<script>" not in clean
+    assert "onclick" not in clean
+    assert "onload" not in clean
+    assert "class=\"btn\"" in clean
+

@@ -62,3 +62,11 @@ assets/logo-alt.png
 
 # PREFERENCES (personal)
 PREFERENCES.md
+
+# Secret / Experimental Prompts
+formats/swarm.json
+
+# Templates & Noise
+.github/
+.crush/
+phrasal_verbs_extracted.md

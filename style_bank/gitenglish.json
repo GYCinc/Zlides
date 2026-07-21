@@ -3,24 +3,21 @@
   "name": "gitEnglish Hub",
   "created_at": "2026-03-31",
   "brand_png": "gitenglish-brand.png",
-  "preview_colors": ["#262424", "#383535", "#ff6600", "#cc4466", "#e0ded2"],
-  "prompt_hint": "Use a dark theme with background #262424, card backgrounds #383535, accent color #ff6600 (burnt orange), text color #e0ded2, border color #555252. Body uses a system-ui font stack (pre-installed on all devices — do NOT load or import any font for body text). Headings use 'Raleway' (bold/black weights), which is provided via an embedded @font-face already present in the document. IMPORTANT: Cards must be FLAT and EDITORIAL — NO neumorphic shadows, NO dual-direction box-shadows, NO soft 3D depth effects. Define cards using thin borders (1px solid #555252) and flat tonal contrast between background and card fill. Use border-radius of 8px max — sharp, structured edges. Use the accent color #ff6600 structurally: thin left-border accent bars on cards (3-4px), full-width divider lines under section headers (2-3px), and heading text color. Keep shadows minimal or none — the look is flat, high-contrast, and editorial (think dark-mode IDE meets print magazine, not soft tactile UI). ACCENT GRADIENT: Use a subtle, classy gradient from burnt orange (#ff6600) to burnt rose (#cc4466) on key accent elements — title slides, section header dividers, button hovers, and highlight text. Apply it tastefully and sparingly (e.g. background: linear-gradient(135deg, #ff6600, #cc4466) on the main accent bar or hero text). It should feel premium and a little bold, not flashy. Include the gitEnglish logo image in a footer or corner. All CSS must be inline in a single <style> tag — no external CDN links, no Tailwind CDN, no <script> tags, and NO @import or <link> for fonts (the document must render fully offline as a standalone file).",
+  "preview_colors": ["#0f1112", "#16181a", "#ff6b35", "#8a1c00", "#e5e7eb"],
+  "prompt_hint": "Use a dark, premium editorial theme. Background `#0f1112`, card background `#16181a` (or `rgba(39, 39, 42, 0.3)`), accent color `#ff6b35` (burnt mandarin), secondary text `#9ca3af`, primary text `#e5e7eb`, border `#3f3f46`. Typography: Body uses system-ui. Headings MUST use 'Raleway' font, weight 800 (black), and uppercase. Do NOT use tight letter-spacing or negative word-spacing; keep the spacing readable. ACCENT GRADIENT: Use a subtle gradient from burnt mandarin (#ff6b35) to burnt blood (#8a1c00) for structural accents like thin left-borders on cards (3-4px), subtle dividers under section headers. Layout Elements: Use a `.summary-box` class with a thin border and an absolutely positioned top-left `.summary-label` (uppercase, monospace, accent color). Use `.card` classes with the gradient left-border and flat backgrounds. All CSS must be inline in a single <style> tag. ICONS: Add these explicit CSS rules for SVG icons to make them large and premium: `svg { width: 32px; height: 32px; stroke-width: 2px; color: #ff6b35; margin-right: 12px; vertical-align: middle; }`. Do NOT use basic emojis, use clean, professional inline SVGs (like Lucide style) and apply the SVG sizing CSS.",
   "css": {
-    "bg": "#262424",
-    "card": "#383535",
-    "text": "#e0ded2",
-    "text_secondary": "#9e9e9e",
-    "accent": "#ff6600",
-    "accent_rose": "#cc4466",
-    "accent_hover": "#ff9966",
-    "border": "#555252",
-    "success": "#5ab244",
-    "danger": "#e8514a"
+    "bg": "#0f1112",
+    "card": "#16181a",
+    "text": "#e5e7eb",
+    "text_secondary": "#9ca3af",
+    "accent": "#ff6b35",
+    "accent_blood": "#8a1c00",
+    "border": "#3f3f46"
   },
   "fonts": {
     "body": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     "heading": "'Raleway', system-ui, sans-serif"
   },
   "card_style": "flat",
-  "print_css": "@media print { body { background: #fff !important; color: #333 !important; } .ge-card { background: #f5f5f5 !important; box-shadow: none !important; border: 1px solid #ddd !important; } .ge-accent { color: #cc5500 !important; } button[id='regenerate'] { display: none !important; } @page { margin: 1.5cm; size: A4; } }"
+  "print_css": "@media print { body { background: #fff !important; color: #333 !important; } .ge-card, .card, .summary-box { background: #f9f9f9 !important; border: 1px solid #ccc !important; box-shadow: none !important; } .ge-accent, svg { color: #cc5500 !important; } button[id='regenerate'] { display: none !important; } @page { margin: 1.5cm; size: A4; break-inside: avoid; } }"
 }

@@ -1,0 +1,6 @@
+@media print {
+  section, .slide, [class*="card"], [class*="slide"], [class*="section"] {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

@@ -11,12 +11,13 @@
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.2",
-    "@lucide/svelte": "^1.21.0",
+    "@lucide/svelte": "^1.25.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.12.3",
     "bits-ui": "^2.18.1",
+    "embla-carousel-svelte": "^8.6.0",
     "svelte": "^5.55.5",
     "svelte-check": "^4.4.8",
     "tailwind-variants": "^3.2.2",
@@ -25,7 +26,7 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
-    "@humanspeak/svelte-markdown": "^1.6.0",
+    "@humanspeak/svelte-markdown": "^1.8.4",
     "@humanspeak/svelte-virtual-chat": "^0.1.16",
     "@tailwindcss/typography": "^0.5.20",
     "clsx": "^2.1.1",

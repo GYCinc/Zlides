@@ -22,7 +22,7 @@ import urllib.error
 import webbrowser
 from pathlib import Path
 
-BASE_URL = "http://localhost:2828"
+BASE_URL = "http://127.0.0.1:2828"
 
 
 def main():
@@ -58,6 +58,11 @@ def main():
         type=int,
         default=None,
         help="Number of pages/slides (default: let agent decide)",
+    )
+    parser.add_argument(
+        "-r", "--role",
+        default="balanced",
+        help="Graphic designer persona (e.g. balanced, bold-creative, swiss-minimalist, academic, editorial) (default: balanced)",
     )
     parser.add_argument(
         "-o", "--output",
@@ -96,6 +101,7 @@ def main():
         "message": content,
         "format": args.format,
         "style": args.style,
+        "role": args.role,
         "page_count": args.pages,
     }).encode("utf-8")
 

@@ -1,0 +1,6 @@
+{
+  "id": "report",
+  "name": "Report",
+  "description": "Professional document/report with grid layouts",
+  "prompt": "Create an HTML document/report. Structure with a top `<header>` (containing title and metadata). Use `<section>` blocks for content. Integrate `<div class=\"summary-box\">` for executive summaries or key takeaways with an absolutely positioned `.summary-label`. VOCABULARY/PHRASAL VERBS: When listing vocabulary or phrasal verbs, use `<section class=\"section-break\">` and a `<div class=\"section-header\">` with a `<span class=\"count-label\">`. For Phrasal Verbs specifically, you MUST provide these 4 data points: 1) The Phrasal Verb, 2) The Definition (keep it concise, ideally 10-15 words), 3) A single-word English Latinate synonym, and 4) The % of time it's used vs the non-PV & the Impact on the message. Wrap items in `<div class=\"grid-3\">` and define CSS `.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }` so that vocab and phrasal verbs span 3 columns. Format this data cleanly inside `<div class=\"card\">` elements. ICONS: ONLY use premium, modern inline SVGs (like Lucide outline icons). NEVER use emojis. TEXT CONSTRAINTS: Keep definitions and explanations concise, but don't artificially break grammar just to hit a strict word count. Professional document layout suitable for printing."
+}

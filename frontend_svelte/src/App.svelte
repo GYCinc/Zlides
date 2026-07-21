@@ -1,45 +1,49 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import SvelteMarkdown from '@humanspeak/svelte-markdown';
-  import { markedMermaid, MermaidRenderer } from '@humanspeak/svelte-markdown/extensions';
-  import type { StreamingChunk, RendererComponent, Renderers } from '@humanspeak/svelte-markdown';
-
-  interface MermaidRenderers extends Renderers {
-      mermaid: RendererComponent;
-  }
-
-  const renderers: Partial<MermaidRenderers> = {
-      mermaid: MermaidRenderer
-  };
+  import * as Card from "$lib/components/ui/card/index.js";
+  import * as Carousel from "$lib/components/ui/carousel/index.js";
 
   import * as ChainOfThought from '$lib/components/ai-elements/chain-of-thought';
   import SvelteVirtualChat from '@humanspeak/svelte-virtual-chat';
+  import SvelteMarkdown from '@humanspeak/svelte-markdown';
 
 
-  let cost = 0.00;
-  let isGenerating = false;
-  let isBatchMode = false;
-  let isUploading = false;
-  let status = "Ready";
 
-  let customApiKey = "";
-  let customBaseUrl = "";
-  let showApiSettings = false;
+  let cost = $state(0.00);
+  let isGenerating = $state(false);
 
-  let slides: any[] = [];
-  let currentSlideIndex = 0;
+  let isUploading = $state(false);
+  let status = $state("Ready");
+
+  let customApiKey = $state("");
+  let customBaseUrl = $state("");
+  let showApiSettings = $state(false);
+
+  let slides = $state<{html: string, title: string}[]>([]);
+  let currentSlideIndex = $state(0);
   // Included a mock RR button to prove the concept works when dropped in
-  let iframeSrcDoc = "<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#131313;color:#888;font-family:sans-serif;margin:0;'><div style='text-align:center;'><h3>Zlides Preview</h3><p style='font-size:12px;color:#555;'>Your generated presentation will appear here.</p></div></body></html>";
+  let iframeSrcDoc = $state("<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#131313;color:#888;font-family:sans-serif;margin:0;'><div style='text-align:center;'><h3>Zlides Preview</h3><p style='font-size:12px;color:#555;'>Your generated presentation will appear here.</p></div></body></html>");
 
-  let promptText = "";
-  let files: FileList | null = null;
-  let extractedMarkdown = "";
-  let uploadMode = "content"; // 'content' or 'style'
+  let promptText = $state("");
+  let files = $state<FileList | null>(null);
+  let extractedMarkdown = $state("");
+  let uploadMode = $state("none"); // 'none', 'content', 'style', or 'reference'
 
   onMount(async () => {
     if (typeof localStorage !== 'undefined') {
       customApiKey = localStorage.getItem('zlides_api_key') || '';
       customBaseUrl = localStorage.getItem('zlides_base_url') || 'https://api.z.ai/api/v1/agents';
+      accumulatedCost = parseFloat(localStorage.getItem('zlides_accumulated_cost') || '0');
+      costResetDate = localStorage.getItem('zlides_cost_reset_date') || '';
+      if (!costResetDate) {
+        costResetDate = new Date().toLocaleString();
+        localStorage.setItem('zlides_cost_reset_date', costResetDate);
+      }
+      try {
+        costHistory = JSON.parse(localStorage.getItem('zlides_cost_history') || '[]');
+      } catch (e) {
+        costHistory = [];
+      }
     }
 
     // Load styles from the backend
@@ -48,6 +52,14 @@
       availableStyles = await resp.json();
     } catch (e) {
       console.warn("Could not load styles:", e);
+    }
+
+    // Load roles from the backend
+    try {
+      const resp = await fetch("/roles");
+      availableRoles = await resp.json();
+    } catch (e) {
+      console.warn("Could not load roles:", e);
     }
 
     // Listen for RR format regeneration requests from the iframe
@@ -78,7 +90,7 @@
         body: JSON.stringify({
           prompt: promptText + (extractedMarkdown || ""),
           files_attached: files ? files.length : 0,
-          format: selectedFormat,
+          format: apiFormat,
           page_count: pageCount
         })
       });
@@ -89,20 +101,26 @@
     }
   }
 
-  $: {
+  $effect(() => {
     promptText;
     extractedMarkdown;
     files;
-    selectedFormat;
+    apiFormat;
     pageCount;
     updateCost();
-  }
-  $: isBatchMode = promptText.trim().startsWith("/batch");
+  });
+  let isBatchMode = $derived(promptText.trim().startsWith("/batch"));
 
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
     if (target.files && target.files.length > 0) {
       files = target.files;
+      if (uploadMode === "none") {
+        extractedMarkdown = "";
+        status = `File attached: ${files[0].name}`;
+        updateCost();
+        return;
+      }
       isUploading = true;
       status = `Ingesting ${files[0].name} via File Parser API...`;
 
@@ -147,47 +165,150 @@
   }
 
 
-  let isThinking = false;
-  let thoughts: string[] = [];
+  let isThinking = $state(false);
+  let thoughts = $state<string[]>([]);
 
-  let toolCalls: { name: string, input: string }[] = [];
-  let currentToolBuffer = '';
-  let currentToolName = '';
+  let toolCalls = $state<{name: string, input: string}[]>([]);
+  let currentToolBuffer = $state('');
+  let currentToolName = $state('');
 
-let currentController: AbortController | null = null;
-  let liveHtmlChunks: string[] = [];
-  let iframeElement: HTMLIFrameElement | null = null;
-  let thinkingBuffer = '';
+  let currentController = $state<AbortController | null>(null);
+  interface LiveHtmlPage {
+    position: number[];
+    html: string;
+  }
+  let liveHtmlPages = $state<LiveHtmlPage[]>([]);
+  let iframeElement = $state<HTMLIFrameElement | null>(null);
+  let thinkingBuffer = $state('');
 
   // We'll define these fully in Step 3, but provide stubs to make TS happy
-  let msgIdCounter = 0;
+  let msgIdCounter = $state(0);
   function nextId() { return `msg-${++msgIdCounter}`; }
-  let chatMessages: any[] = [{ id: nextId(), role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
-  let selectedFormat = "slides";
-  let selectedStyle = "auto";
-  let pageCount: number | null = null;
-  let availableStyles: any[] = [];
+  let chatMessages = $state<any[]>([]);
+  let selectedLayout = $state("slides");
+  let selectedContentLayout = $state("auto");
+  let selectedStyle = $state("auto");
+  let selectedRole = $state("balanced");
+  let pageCount = $state<number | null>(null);
+  let availableStyles = $state<any[]>([]);
+  let availableRoles = $state<any[]>([]);
 
-  let showStyleEditor = false;
-  let showAdvancedColors = false;
-  let showPreferences = false;
-  let preferencesText = "";
-  let isEditMode = false;
-  let showRecent = false;
-  let recentSlides: any[] = [];
-  let chatViewport: any;
-  let editingStyleId = "";
-  let editingStyleName = "";
-  let editingStylePromptHint = "";
-  let editingStyleBg = "#ffffff";
-  let editingStyleCard = "#f8f9fa";
-  let editingStyleText = "#1e293b";
-  let editingStyleAccent = "#2563eb";
-  let editingStyleTextSecondary = "#64748b";
-  let editingStyleBorder = "#e2e8f0";
-  let editingStyleSuccess = "#16a34a";
-  let editingStyleDanger = "#dc2626";
-  let editingStyleAccentHover = "#1d4ed8";
+  // Layout Shape options
+  const layoutShapeOptions = [
+    { id: "slides", name: "Slides" },
+    { id: "document", name: "Document" },
+    { id: "web page", name: "Web Page" }
+  ];
+
+  // Content Layout options
+  const contentLayoutOptions = [
+    { id: "auto", name: "Auto" },
+    { id: "worksheet", name: "Worksheet" },
+    { id: "report", name: "Report" },
+    { id: "rr", name: "RR (RegenResource)" },
+    { id: "swarm", name: "Swarm (Agent Test)" }
+  ];
+
+  let styleOptions = $derived([
+    { id: "auto", name: "Auto" },
+    ...availableStyles.filter(s => s.id !== "auto")
+  ]);
+
+  let roleOptions = $derived([
+    { id: "balanced", name: "Balanced" },
+    ...availableRoles.filter(r => r.id !== "balanced")
+  ]);
+
+  // Map to API values
+  let apiStyle = $derived(selectedStyle);
+  let apiFormat = $derived(
+    selectedContentLayout !== "auto"
+      ? selectedContentLayout
+      : selectedLayout === "slides"
+      ? "slides"
+      : selectedLayout === "document"
+      ? "report"
+      : selectedLayout === "web page"
+      ? "poster"
+      : "slides"
+  );
+
+  let showStyleEditor = $state(false);
+  let showAdvancedColors = $state(false);
+  let showPreferences = $state(false);
+  let preferencesText = $state("");
+  let requestSystemPrompt = $state("");
+  let showAdvancedPromptOptions = $state(false);
+  let showPromptPreviewModal = $state(false);
+  let isEditMode = $state(false);
+  let showExportDropdown = $state(false);
+  let showRecent = $state(false);
+  let recentSlides = $state<any[]>([]);
+  let chatViewport = $state<any>(null);
+
+  // SvelteVirtualChat handles follow-bottom natively, so we don't need manual scrolling.
+  let editingStyleId = $state("");
+  let editingStyleName = $state("");
+  let editingStylePromptHint = $state("");
+  let editingStyleBg = $state("#ffffff");
+  let editingStyleCard = $state("#f8f9fa");
+  let editingStyleText = $state("#1e293b");
+  let editingStyleAccent = $state("#2563eb");
+  let editingStyleTextSecondary = $state("#64748b");
+  let editingStyleBorder = $state("#e2e8f0");
+  let editingStyleSuccess = $state("#16a34a");
+  let editingStyleDanger = $state("#dc2626");
+  let editingStyleAccentHover = $state("#1d4ed8");
+
+  // Cost and Preview Management
+  let accumulatedCost = $state(0.00);
+  let costResetDate = $state("");
+  let costHistory = $state<any[]>([]);
+  let showCostHistory = $state(false);
+  let previewSlideFile = $state<any>(null);
+
+  function saveGenerationCost(prompt: string, finalCost: number) {
+    accumulatedCost += finalCost;
+    const newEntry = {
+      id: nextId(),
+      prompt: prompt || "Vibe generation",
+      cost: finalCost,
+      date: new Date().toLocaleString(),
+    };
+    costHistory = [newEntry, ...costHistory];
+    
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('zlides_accumulated_cost', accumulatedCost.toString());
+      localStorage.setItem('zlides_cost_history', JSON.stringify(costHistory));
+    }
+  }
+
+  function resetAccumulatedCost() {
+    accumulatedCost = 0.00;
+    costResetDate = new Date().toLocaleString();
+    costHistory = [];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('zlides_accumulated_cost', '0');
+      localStorage.setItem('zlides_cost_reset_date', costResetDate);
+      localStorage.setItem('zlides_cost_history', '[]');
+    }
+  }
+
+  function cyclePreview(direction: number) {
+    if (!previewSlideFile || recentSlides.length <= 1) return;
+    const idx = recentSlides.findIndex(s => s.filename === previewSlideFile.filename);
+    if (idx === -1) return;
+    let nextIdx = idx + direction;
+    if (nextIdx < 0) nextIdx = recentSlides.length - 1;
+    if (nextIdx >= recentSlides.length) nextIdx = 0;
+    previewSlideFile = recentSlides[nextIdx];
+  }
+
+  async function loadPreviewedToWorkspace() {
+    if (!previewSlideFile) return;
+    await openRecentSlide(previewSlideFile.filename, previewSlideFile.title);
+    previewSlideFile = null;
+  }
 
   async function openStyleEditor() {
     if (selectedStyle === 'auto') return;
@@ -304,10 +425,22 @@ let currentController: AbortController | null = null;
   }
 
   async function exportPdf(branded = false) {
-    if (!slides.length) return;
+    let filename = prompt("Enter a filename for the PDF:", "document.pdf");
+    if (!filename) return; // User cancelled
+    if (!filename.toLowerCase().endsWith('.pdf')) filename += '.pdf';
+    
     status = branded ? "Generating branded PDF..." : "Generating print-friendly PDF...";
     try {
-      const html = slides[currentSlideIndex].html;
+      let html = "";
+      if (iframeElement?.contentDocument?.documentElement) {
+        html = `<!DOCTYPE html>\n${iframeElement.contentDocument.documentElement.outerHTML}`;
+      } else if (slides.length > 0) {
+        html = slides[currentSlideIndex].html;
+      } else {
+        html = iframeSrcDoc;
+      }
+      if (!html) throw new Error("No HTML content available to export");
+
       const resp = await fetch("/export/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -320,7 +453,7 @@ let currentController: AbortController | null = null;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `slide_${currentSlideIndex + 1}.pdf`;
+      link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
       status = "PDF exported!";
@@ -330,14 +463,51 @@ let currentController: AbortController | null = null;
   }
 
   function exportHtml() {
-    if (!slides.length) return;
-    const html = slides[currentSlideIndex].html;
+    let filename = prompt("Enter a filename for the HTML document:", "document.html");
+    if (!filename) return; // User cancelled
+    if (!filename.toLowerCase().endsWith('.html')) filename += '.html';
+    
+    let html = "";
+    if (iframeElement?.contentDocument?.documentElement) {
+      html = `<!DOCTYPE html>\n${iframeElement.contentDocument.documentElement.outerHTML}`;
+    } else if (slides.length > 0) {
+      html = slides[currentSlideIndex].html;
+    } else {
+      html = iframeSrcDoc;
+    }
+    
+    if (!html) {
+      status = "No HTML content available to export";
+      return;
+    }
+    
     const blob = new Blob([html], { type: 'text/html' });
     const link = document.createElement('a');
-    link.download = `slide_${currentSlideIndex + 1}.html`;
+    link.download = filename;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
+  }
+
+  async function startNewConversation() {
+    try {
+      status = "Clearing conversation context...";
+      const resp = await fetch("/conversation/clear", { method: "POST" });
+      if (resp.ok) {
+        chatMessages = [{ id: nextId(), role: "agent", text: "Ready! New conversation started. Pick a format + style, describe what you want." }];
+        liveHtmlPages = [];
+        iframeSrcDoc = "";
+        status = "Conversation cleared! Context token count reset.";
+        setTimeout(() => {
+          status = "Ready";
+        }, 1500);
+      } else {
+        status = "Failed to clear conversation";
+      }
+    } catch (e) {
+      console.error(e);
+      status = "Error clearing conversation";
+    }
   }
 
   async function openPreferences() {
@@ -376,6 +546,18 @@ let currentController: AbortController | null = null;
     }
   }
 
+  async function deleteRecentSlide(filename: string) {
+    if (!confirm(`Are you sure you want to delete this slide?`)) return;
+    try {
+      const resp = await fetch(`/saved/${filename}`, { method: 'DELETE' });
+      if (resp.ok) {
+        recentSlides = recentSlides.filter(s => s.filename !== filename);
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  }
+
   async function openRecentSlide(filename: string, title: string) {
     try {
       const resp = await fetch(`/saved/${filename}`);
@@ -389,15 +571,15 @@ let currentController: AbortController | null = null;
     }
   }
 
-  $: if (isEditMode && iframeElement?.contentDocument?.body) {
-    iframeElement.contentDocument.body.contentEditable = 'true';
-    iframeElement.contentDocument.body.style.outline = '2px solid #ff6600';
-    iframeElement.contentDocument.body.style.outlineOffset = '-2px';
-  }
+  $effect(() => {
+    if (isEditMode && iframeElement?.contentDocument?.body) {
+      iframeElement.contentDocument.body.contentEditable = 'true';
+      iframeElement.contentDocument.body.style.outline = '2px solid #ff6600';
+      iframeElement.contentDocument.body.style.outlineOffset = '-2px';
+    }
+  });
 
-  $: if (isGenerating && chatViewport) {
-    setTimeout(() => chatViewport?.scrollToBottom({ smooth: true }), 50);
-  }
+
 
   function toggleEditMode() {
     isEditMode = !isEditMode;
@@ -434,6 +616,56 @@ let currentController: AbortController | null = null;
     status = "Edit captured — review prompt and hit send to apply everywhere";
   }
 
+  function getAssembledPrompt() {
+    const roleObj = availableRoles.find(r => r.id === selectedRole) || { prompt: "You are an expert graphic designer, curriculum developer, and professional presentations editor. You specialize in designing high-quality, beautiful, and semantic HTML layouts for slides, posters, reports, and interactive worksheets. Your designs are modern, clean, print-friendly, and visually outstanding." };
+    
+    let formatText = "";
+    if (apiFormat === "slides") {
+      formatText = "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate.";
+    } else if (apiFormat === "poster") {
+      formatText = "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense.";
+    } else if (apiFormat === "worksheet") {
+      formatText = "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only.";
+    } else if (apiFormat === "report") {
+      formatText = "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.";
+    } else if (apiFormat === "rr") {
+      formatText = "Create an interactive HTML learning resource. You must identify specific content items (e.g. exercise questions, example sentences, vocabulary lists, practice prompts) that should be dynamic and refreshable. For each refreshable item, adhere to this strict HTML structural layout: (1) Wrap the entire item module in a parent container with the class 'card' or 'exercise-card'. (2) Inside that card, wrap the specific content block to be replaced in an inner container with class='question-item' or an id attribute ending in '-container' (e.g., id='sentence-1-container'). (3) Place a button with class='regenerate-btn' (or an id starting with 'regenerate') inside the card, containing a detailed data-prompt attribute specifying exactly how to regenerate that specific block of content. Do NOT inject script tags, inline onclick handlers, or styles that target parent layouts. Keep the HTML clean, semantic, and layout-agnostic so that the host portal can bind click listeners dynamically.";
+    }
+
+    let base = `${roleObj.prompt}\n\nCreate a ${apiFormat} (HTML format).\n\n${formatText}`;
+    
+    if (preferencesText) {
+      base += `\n\n--- USER PREFERENCES (follow these closely) ---\n${preferencesText}`;
+    }
+    
+    if (selectedStyle && selectedStyle !== "auto") {
+      const style = availableStyles.find(s => s.id === selectedStyle);
+      if (style) {
+        base += `\n\nStyle: ${style.prompt_hint || style.name || selectedStyle}`;
+        if (style.css) {
+          base += `\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\nYou must explicitly use these exact hex colors in your inline CSS styling:\n`;
+          for (const [k, v] of Object.entries(style.css)) {
+            base += `- ${k}: ${v}\n`;
+          }
+        }
+      }
+    }
+    
+    base += `\n\n--- PRINT-FRIENDLY OUTPUT RULES ---\nYour HTML will be printed and exported to PDF. Follow these rules:\n- Use page-break-inside: avoid on cards, sections, and self-contained content blocks.\n- Avoid fixed pixel heights on containers that should grow with content.\n- Prefer relative units (em, %, vh) over large fixed pixel dimensions.\n- Ensure text remains readable if backgrounds are removed (sufficient contrast).\n`;
+    
+    if (pageCount) {
+      base += `\nCRITICAL: MUST create exactly ${pageCount} ${apiFormat === 'slides' ? 'slides' : 'sections'}.`;
+    }
+    
+    let userMsg = promptText + (extractedMarkdown ? "\n\n" + extractedMarkdown : "");
+    if (requestSystemPrompt) {
+      userMsg = `${requestSystemPrompt}\n\n${userMsg}`;
+    }
+    
+    base += `\n\nUSER REQUEST:\n${userMsg}`;
+    return base;
+  }
+
 
   function extractImages(thought: string) {
     const images = [];
@@ -451,21 +683,35 @@ let currentController: AbortController | null = null;
 
 
   function renderLiveHtmlChunks() {
-    const combined = liveHtmlChunks.join('')
+    const sortedPages = [...liveHtmlPages].sort((a, b) => {
+      const len = Math.min(a.position.length, b.position.length);
+      for (let i = 0; i < len; i++) {
+        if (a.position[i] !== b.position[i]) {
+          return a.position[i] - b.position[i];
+        }
+      }
+      return a.position.length - b.position.length;
+    });
+
+    const combined = sortedPages.map(p => p.html).join('')
         .replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        
     try {
         const doc = iframeElement?.contentDocument;
-        if (doc && doc.body && doc.body.innerHTML.length > 0) {
-            const prevScroll = doc.documentElement.scrollTop || doc.body.scrollTop;
-            doc.body.innerHTML = combined;
-            doc.documentElement.scrollTop = doc.body.scrollTop = prevScroll;
+        if (doc) {
+            const prevScroll = doc.documentElement?.scrollTop || doc.body?.scrollTop || 0;
+            doc.open();
+            doc.write(combined);
+            doc.close();
+            if (doc.documentElement) doc.documentElement.scrollTop = prevScroll;
+            if (doc.body) doc.body.scrollTop = prevScroll;
         } else {
             iframeSrcDoc = combined;
         }
     } catch(e) {
         iframeSrcDoc = combined;
     }
-    status = `Streaming... (${liveHtmlChunks.length} chunks)`;
+    status = `Streaming... (${liveHtmlPages.length} pages)`;
   }
 
   function addMessage(text: string, role: string) {
@@ -504,7 +750,10 @@ let currentController: AbortController | null = null;
     const textToSend = promptText;
     promptText = "";
     status = "Generating...";
-    addMessage(`[${selectedFormat} / ${selectedStyle}] ${textToSend}`, 'user');
+    addMessage(`[${apiFormat} / ${apiStyle}] ${textToSend}`, 'user');
+
+    let costSavedForThisRun = false;
+    const finalPrompt = textToSend || (files ? `Uploaded: ${files[0].name}` : "Vibe generation");
 
     // Estimate input cost dynamically
     const combinedInputText = textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : "");
@@ -515,7 +764,7 @@ let currentController: AbortController | null = null;
     let totalOutputChars = 0;
 
     currentController = new AbortController();
-    liveHtmlChunks = [];
+    liveHtmlPages = [];
     thinkingBuffer = '';
     thoughts = [];
     toolCalls = [];
@@ -529,8 +778,10 @@ let currentController: AbortController | null = null;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : ""),
-          format: selectedFormat,
-          style: selectedStyle,
+          format: apiFormat,
+          style: apiStyle,
+          role: selectedRole,
+          system_prompt: requestSystemPrompt || undefined,
           page_count: pageCount,
           api_key: customApiKey || undefined,
           base_url: customBaseUrl || undefined,
@@ -563,7 +814,8 @@ let currentController: AbortController | null = null;
 
                 // Accumulate output characters for live cost ticker
                 let chunkChars = 0;
-                if (data.text) chunkChars += data.text.length;
+                const textContent = data.text || data.content || '';
+                if (textContent) chunkChars += textContent.length;
                 if (data.html && data.type !== 'final_html') chunkChars += data.html.length;
                 
                 if (chunkChars > 0) {
@@ -575,7 +827,7 @@ let currentController: AbortController | null = null;
                 }
 
                 if (data.type === 'thinking') {
-                  thinkingBuffer += data.text;
+                  thinkingBuffer += textContent;
 
                   // Batch thoughts by paragraph (double newline) or at 150+ chars on a single newline
                   const paragraphBreak = thinkingBuffer.indexOf('\n\n');
@@ -631,11 +883,12 @@ let currentController: AbortController | null = null;
                   isThinking = false;
 
                   const lastMsg = chatMessages[chatMessages.length - 1];
+                  const answerText = data.text || data.content || '';
                   if (lastMsg && lastMsg.role === 'agent') {
-                    lastMsg.text += data.text;
+                    lastMsg.text += answerText;
                     chatMessages = [...chatMessages];
                   } else {
-                    addMessage(data.text, 'agent');
+                    addMessage(answerText, 'agent');
                   }
                 }
 
@@ -647,7 +900,13 @@ let currentController: AbortController | null = null;
                   if (data.tool) {
                     toolCalls = [...toolCalls, { name: data.tool, input: `Render slide page at position ${data.position || ''}` }];
                   }
-                  liveHtmlChunks.push(data.html || '');
+                  const pos = data.position || [0];
+                  const existingIdx = liveHtmlPages.findIndex(p => JSON.stringify(p.position) === JSON.stringify(pos));
+                  if (existingIdx !== -1) {
+                    liveHtmlPages[existingIdx].html = data.html || '';
+                  } else {
+                    liveHtmlPages = [...liveHtmlPages, { position: pos, html: data.html || '' }];
+                  }
                   renderLiveHtmlChunks();
                 }
 
@@ -656,6 +915,11 @@ let currentController: AbortController | null = null;
                   if (data.tool) {
                     toolCalls = [...toolCalls, { name: data.tool, input: `Remove slides at positions ${data.positions || ''}` }];
                   }
+                  const posToRemove = data.positions || (data.position ? [data.position] : []);
+                  liveHtmlPages = liveHtmlPages.filter(p => {
+                    return !posToRemove.some((rem: any) => JSON.stringify(rem) === JSON.stringify(p.position));
+                  });
+                  renderLiveHtmlChunks();
                 }
 
                 if (data.type === 'slide_replace') {
@@ -666,7 +930,13 @@ let currentController: AbortController | null = null;
                   if (data.tool) {
                     toolCalls = [...toolCalls, { name: data.tool, input: `Replace slide at position ${data.position || ''}` }];
                   }
-                  liveHtmlChunks.push(data.html || '');
+                  const pos = data.position || [0];
+                  const existingIdx = liveHtmlPages.findIndex(p => JSON.stringify(p.position) === JSON.stringify(pos));
+                  if (existingIdx !== -1) {
+                    liveHtmlPages[existingIdx].html = data.html || '';
+                  } else {
+                    liveHtmlPages = [...liveHtmlPages, { position: pos, html: data.html || '' }];
+                  }
                   renderLiveHtmlChunks();
                 }
 
@@ -726,154 +996,208 @@ isThinking = false;
     } finally {
       isGenerating = false;
       currentController = null;
+      if (!costSavedForThisRun && cost > 0) {
+        saveGenerationCost(finalPrompt, cost);
+        costSavedForThisRun = true;
+      }
     }
   }
 </script>
 
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
-  <div class="w-full md:w-[500px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
-    <div class="space-y-1 flex-shrink-0">
-      <div class="flex items-center gap-2 flex-wrap">
-        <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway flex items-center gap-2">
-          Zlides
-          <button on:click={loadRecent} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="Recent Files">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+  <div class="w-full md:w-[560px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
+    <div class="flex-shrink-0 flex items-center justify-between border-b border-ge-border/30 pb-3 mb-1">
+      <div class="flex flex-col gap-0.5">
+        <div class="flex items-end gap-2.5">
+          <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway select-none leading-none">
+            Zlides
+          </h1>
+          <span class="text-[10px] font-mono text-ge-text-muted/70 italic tracking-wider mb-0.5 select-none">Drop vibes. Get Zlides.</span>
+        </div>
+        <div class="flex items-center gap-3 mt-3">
+          <button on:click={startNewConversation} class="p-2 rounded-lg bg-ge-card border border-ge-border text-ge-text-muted hover:text-ge-accent hover:border-ge-accent shadow-sm transition-all flex items-center justify-center" title="Reset Conversation">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
           </button>
-          <button on:click={openPreferences} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="Preferences">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <button on:click={loadRecent} class="p-2 rounded-lg bg-ge-card border border-ge-border text-ge-text-muted hover:text-ge-accent hover:border-ge-accent shadow-sm transition-all" title="Recent Files">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
           </button>
-          <button on:click={() => showApiSettings = true} class="text-ge-text-muted hover:text-ge-accent transition-colors" title="API Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <button on:click={openPreferences} class="p-2 rounded-lg bg-ge-card border border-ge-border text-ge-text-muted hover:text-ge-text hover:border-ge-text shadow-sm transition-all" title="Preferences">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
           </button>
-        </h1>
-        {#if isBatchMode}
-          <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
-        {:else}
-          <span class="text-[10px] text-ge-text-muted/70 italic">Mongoose Fast</span>
-        {/if}
-        <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-success font-mono font-bold" title="Estimated Cost">
-          ${cost.toFixed(3)}
-        </span>
-        <span class="relative flex h-2 w-2 ml-1" title={isGenerating || isUploading ? 'Processing...' : 'Ready'}>
-          {#if isGenerating || isUploading}
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-r from-red-700 to-orange-500 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-gradient-to-r from-red-700 to-orange-500"></span>
-          {:else}
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-ge-success"></span>
-          {/if}
-        </span>
+          <button on:click={() => showApiSettings = true} class="p-2 rounded-lg bg-ge-card border border-ge-border text-ge-text-muted hover:text-ge-text hover:border-ge-text shadow-sm transition-all" title="API Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
       </div>
-      <p class="text-ge-text-muted text-xs">Drop vibes. Get slides.</p>
+
+      <!-- Price Estimator Card with history toggle -->
+      <button 
+        on:click|stopPropagation={() => showCostHistory = !showCostHistory}
+        class="bg-ge-bg/70 hover:bg-ge-bg/95 border border-ge-border/40 rounded px-2.5 py-1 flex flex-col items-end min-w-[90px] shadow-inner select-none transition-all group relative cursor-pointer text-right outline-none focus:outline-none"
+        title="Click to view full cost history"
+      >
+        <span class="text-[7px] font-bold uppercase tracking-widest font-mono text-ge-text-muted leading-none">Total / Run</span>
+        <div class="flex items-baseline gap-1 mt-0.5 leading-none">
+          <span class="text-xs font-bold font-mono text-ge-success">${accumulatedCost.toFixed(4)}</span>
+          <span class="text-[9px] font-mono text-ge-text-muted">(${cost.toFixed(4)})</span>
+        </div>
+      </button>
     </div>
 
     <!-- UI Controls -->
     <div class="flex flex-col gap-2 flex-shrink-0 text-xs">
-      <div class="grid grid-cols-3 gap-2">
-        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Format">
-          <select bind:value={selectedFormat} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-1 font-semibold uppercase tracking-wider text-center">
-            {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
-              <option value={fmt} class="bg-ge-card text-ge-text">{fmt}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Style Theme">
-          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-1 pr-12 font-semibold uppercase tracking-wider text-center">
-            {#each availableStyles as style}
-              <option value={style.id} class="bg-ge-card text-ge-text">{style.name}</option>
-            {/each}
-          </select>
-          <div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            {#if selectedStyle !== 'auto'}
-              <button on:click={openStyleEditor} class="hover:text-ge-accent text-ge-text-muted hover:border-ge-accent text-[10px] p-0.5 bg-ge-card border border-ge-border rounded flex items-center justify-center h-5 w-5 pointer-events-auto transition-colors" title="Edit Style">
-                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              </button>
-            {/if}
-            <button on:click={createNewStyle} class="hover:text-ge-accent text-ge-text-muted hover:border-ge-accent text-[10px] p-0.5 bg-ge-card border border-ge-border rounded flex items-center justify-center h-5 w-5 pointer-events-auto transition-colors" title="New Style">
-              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            </button>
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Type -->
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Page size/shape aspect ratio">
+            <select bind:value={selectedLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-[10px] p-0.5 font-semibold uppercase tracking-wider text-center">
+              <option value="" disabled hidden>SHAPE</option>
+              {#each layoutShapeOptions as opt}
+                <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+              {/each}
+            </select>
           </div>
         </div>
 
-        <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent" title="Number of Pages">
-          <input type="number" bind:value={pageCount} min="1" max="20" placeholder="Auto Pages" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-full text-xs p-1 text-center font-semibold uppercase tracking-wider placeholder:text-ge-text-muted/65">
+        <!-- Layout -->
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Content layout structure within the page">
+            <select bind:value={selectedContentLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-[10px] p-0.5 font-semibold uppercase tracking-wider text-center">
+              <option value="" disabled hidden>LAYOUT</option>
+              {#each contentLayoutOptions as opt}
+                <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <!-- Style Selector -->
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="Visual Style Theme">
+            <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-[10px] p-0.5 font-semibold uppercase tracking-wider text-center">
+              <option value="" disabled hidden>STYLE</option>
+              {#each styleOptions as opt}
+                <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <!-- Personality / Role Selector -->
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer" title="AI Graphic Designer Persona">
+            <select bind:value={selectedRole} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-[10px] p-0.5 font-semibold uppercase tracking-wider text-center">
+              <option value="" disabled hidden>PERSONA</option>
+              {#each roleOptions as opt}
+                <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+              {/each}
+            </select>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Chat + Input: one continuous surface -->
-    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm overflow-hidden">
+    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm overflow-hidden bg-ge-bg/30">
       <div class="flex-grow min-h-0">
-      <SvelteVirtualChat
-        bind:this={chatViewport}
-        messages={chatMessages}
-        getMessageId={(msg) => msg.id}
-        estimatedMessageHeight={80}
-        containerClass="h-full bg-ge-bg/30"
-        viewportClass="h-full px-3 py-2"
-      >
-        {#snippet renderMessage(msg)}
-          {#if msg.role !== 'thinking'}
-            <div class="p-2.5 rounded-lg max-w-[85%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm' : 'bg-ge-bg/55 text-ge-text-muted mr-auto border border-ge-border/30'}">
-              {#if msg.role !== 'user'}
-                <div class="text-[9px] font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
-              {/if}
-              {#if msg.role === 'agent' || msg.role === 'thinking'}
-                <div class="prose prose-invert prose-sm max-w-none text-ge-text-muted">
-                  <SvelteMarkdown source={msg.text} extensions={[markedMermaid()]} {renderers} />
-                </div>
-              {:else}
-                <div class="text-ge-text text-xs">{msg.text}</div>
-              {/if}
-            </div>
-          {/if}
-        {/snippet}
+        <SvelteVirtualChat
+          bind:this={chatViewport}
+          messages={chatMessages}
+          getMessageId={(msg) => msg.id}
+          estimatedMessageHeight={80}
+          containerClass="h-full bg-transparent"
+          viewportClass="h-full px-3 py-2 space-y-3.5"
+        >
+          {#snippet renderMessage(msg)}
+            {#if msg.role !== 'thinking'}
+              <div class="p-2.5 rounded-lg max-w-[85%] {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm whitespace-pre-wrap' : 'bg-ge-bg/55 text-ge-text mr-auto border border-ge-border/30'}">
+                {#if msg.role !== 'user'}
+                  <div class="text-[9px] font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
+                  <div class="text-xs prose prose-invert prose-xs max-w-none text-ge-text leading-relaxed">
+                    <SvelteMarkdown source={msg.text} />
+                  </div>
+                {:else}
+                  <div class="text-ge-text text-xs">{msg.text}</div>
+                {/if}
+              </div>
+            {/if}
+          {/snippet}
 
-        {#snippet footer()}
-          {#if thoughts.length > 0 || isThinking}
-            <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
-              <ChainOfThought.Root open={true} defaultOpen={true}>
-                <ChainOfThought.Header />
-                <ChainOfThought.Content>
-                  {#each thoughts as thought, i}
-                    <ChainOfThought.Step
-                      label={stripImages(thought) || "Looking at image..."}
-                      status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
-                    >
-                      {#each extractImages(thought) as img}
-                        <ChainOfThought.Image caption={img.alt}>
-                          <img src={img.url} alt={img.alt} class="w-full h-auto rounded" />
-                        </ChainOfThought.Image>
-                      {/each}
-                    </ChainOfThought.Step>
-                  {/each}
+          {#snippet footer()}
+            {#if thoughts.length > 0 || isThinking}
+              <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
+                <ChainOfThought.Root open={true} defaultOpen={true}>
+                  <ChainOfThought.Header />
+                  <ChainOfThought.Content>
+                    {#each thoughts as thought, i}
+                      <ChainOfThought.Step
+                        label={stripImages(thought) || "Looking at image..."}
+                        status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
+                      >
+                        {#each extractImages(thought) as img}
+                          <ChainOfThought.Image caption={img.alt}>
+                            <img src={img.url} alt={img.alt} class="w-full h-auto rounded" />
+                          </ChainOfThought.Image>
+                        {/each}
+                      </ChainOfThought.Step>
+                    {/each}
 
-                  {#if toolCalls.length > 0}
-                    <ChainOfThought.SearchResults class="mt-2">
-                      {#each toolCalls as call}
-                        <ChainOfThought.SearchResult>{call.name}: {call.input.length > 20 ? call.input.substring(0,20)+'...' : call.input}</ChainOfThought.SearchResult>
-                      {/each}
-                    </ChainOfThought.SearchResults>
-                  {/if}
-                  {#if isThinking && thoughts.length === 0}
-                    <ChainOfThought.Step label="Initializing thought process..." status="active" />
-                  {/if}
-                  {#if isGenerating && !isThinking}
-                    <div class="flex items-center gap-2 text-ge-text-muted text-xs py-2">
-                      <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
-                      <span>Generating slides...</span>
-                    </div>
-                  {/if}
-                </ChainOfThought.Content>
-              </ChainOfThought.Root>
-            </div>
-          {/if}
-        {/snippet}
-      </SvelteVirtualChat>
+                    {#if toolCalls.length > 0}
+                      <ChainOfThought.SearchResults class="mt-2">
+                        {#each toolCalls as call}
+                          <ChainOfThought.SearchResult>{call.name}: {call.input.length > 20 ? call.input.substring(0,20)+'...' : call.input}</ChainOfThought.SearchResult>
+                        {/each}
+                      </ChainOfThought.SearchResults>
+                    {/if}
+                    {#if isThinking && thoughts.length === 0}
+                      <ChainOfThought.Step label="Initializing thought process..." status="active" />
+                    {/if}
+                    {#if isGenerating && !isThinking}
+                      <div class="flex items-center gap-2 text-ge-text-muted text-xs py-2">
+                        <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
+                        <span>Generating slides...</span>
+                      </div>
+                    {/if}
+                  </ChainOfThought.Content>
+                </ChainOfThought.Root>
+              </div>
+            {/if}
+          {/snippet}
+        </SvelteVirtualChat>
       </div>
 
       <div class="flex flex-col bg-ge-bg/30 border-t border-ge-border/30 p-2.5 relative min-h-[140px] flex-shrink-0">
+        <!-- Advanced Collapsible Toggle -->
+        <div class="flex justify-between items-center mb-1 text-[9px] select-none text-ge-text-muted font-bold tracking-wider font-mono">
+          <button 
+            on:click={() => showAdvancedPromptOptions = !showAdvancedPromptOptions} 
+            class="hover:text-ge-text transition-colors flex items-center gap-1 cursor-pointer uppercase"
+          >
+            <svg class="transition-transform duration-200" class:rotate-90={showAdvancedPromptOptions} xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m9 18 6-6-6-6"/></svg>
+            <span>One-Shot System Prompt</span>
+          </button>
+          
+          {#if showAdvancedPromptOptions}
+            <button 
+              on:click={() => showPromptPreviewModal = true} 
+              class="hover:text-ge-accent transition-colors flex items-center gap-1 cursor-pointer uppercase"
+            >
+              <span>[Preview Assembled Prompt]</span>
+            </button>
+          {/if}
+        </div>
+
+        {#if showAdvancedPromptOptions}
+          <div class="mb-2.5 border-b border-ge-border/20 pb-2">
+            <textarea
+              bind:value={requestSystemPrompt}
+              placeholder="Inject custom system rules for THIS run only (e.g. 'Use 3-column layouts. Keep paragraphs extremely short.')"
+              class="w-full h-12 bg-ge-bg/60 border border-ge-border/40 rounded p-1.5 outline-none focus:border-ge-accent text-[11px] font-mono text-ge-text resize-none placeholder:text-ge-text-muted/40"
+            ></textarea>
+          </div>
+        {/if}
+
         <textarea
           bind:value={promptText}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
@@ -890,19 +1214,25 @@ isThinking = false;
                {:else}
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                {/if}
-               <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} />
+               <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.apkg,.zip,.txt,.md,.csv" disabled={isUploading} />
              </label>
 
              <select bind:value={uploadMode} class="bg-ge-card border border-ge-border rounded px-1.5 py-0.5 text-[10px] text-ge-text-muted outline-none focus:border-ge-accent cursor-pointer h-7 select-none">
+               <option value="none" class="bg-ge-card text-ge-text">No Selection</option>
                <option value="content" class="bg-ge-card text-ge-text">Remake Content</option>
                <option value="style" class="bg-ge-card text-ge-text">Harvest Style</option>
                <option value="reference" class="bg-ge-card text-ge-text">Reference</option>
              </select>
+
+             <div class="flex items-center gap-1 bg-ge-card border border-ge-border rounded px-1.5 h-7">
+               <span class="text-[10px] text-ge-text-muted font-bold select-none uppercase tracking-wider font-mono">Pages:</span>
+               <input type="number" bind:value={pageCount} min="1" max="20" placeholder="Auto" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-12 text-[11px] font-semibold text-center placeholder:text-ge-text-muted/65 p-0" title="Number of Pages">
+             </div>
            </div>
 
-            <div class="flex items-center gap-2 pointer-events-auto">
+            <div class="flex items-center justify-end gap-2 pointer-events-auto shrink-0 min-w-0">
               {#if files}
-                <span class="text-[11px] bg-ge-card border border-ge-border px-2 py-0.5 rounded text-ge-accent truncate max-w-[150px]" title={files[0].name}>{files[0].name}</span>
+                <span class="text-[11px] bg-ge-card border border-ge-border px-2 py-0.5 rounded text-ge-accent truncate max-w-[120px] min-w-[30px] shrink block" title={files[0].name}>{files[0].name}</span>
               {/if}
               {#if isGenerating}
                 <button on:click={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1 h-7 animate-pulse">
@@ -1088,28 +1418,139 @@ isThinking = false;
         </div>
       {/if}
 
-      {#if showRecent}
-        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-30 overflow-y-auto border-r border-ge-border">
+      {#if showPromptPreviewModal}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-40 overflow-y-auto border-r border-ge-border animate-in fade-in duration-200">
           <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
-            <h2 class="text-sm font-bold text-ge-accent font-raleway">Recent Files</h2>
-            <button on:click={() => showRecent = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">Assembled Prompt Preview</h2>
+            <button on:click={() => showPromptPreviewModal = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold cursor-pointer">Close</button>
           </div>
-          {#if recentSlides.length === 0}
-            <p class="text-ge-text-muted text-xs">No saved slides yet.</p>
+          <p class="text-[10px] text-ge-text-muted mb-2 font-mono">This is the exact full context string that will be sent to Z.AI for your request:</p>
+          <pre class="bg-ge-bg border border-ge-border rounded p-2.5 outline-none text-ge-text font-mono text-[10px] flex-grow overflow-auto whitespace-pre-wrap select-all leading-relaxed">{getAssembledPrompt()}</pre>
+          <button on:click={() => showPromptPreviewModal = false} class="mt-3 bg-ge-accent text-ge-bg font-bold py-2 px-4 rounded text-xs hover:opacity-90 transition-all cursor-pointer">Back to Workspace</button>
+        </div>
+      {/if}
+
+      {#if showRecent}
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 font-sans animate-in fade-in duration-200">
+          <div class="relative w-full max-w-[90vw] h-[90vh] flex flex-col items-center justify-center">
+            
+            <div class="absolute top-0 right-0 z-50 flex gap-2">
+              <button on:click={() => showRecent = false} class="px-4 py-2 bg-ge-card border border-ge-border rounded-lg text-ge-text hover:text-ge-accent transition-colors font-bold shadow-lg">Close Gallery</button>
+            </div>
+
+            <div class="text-center mb-6">
+              <h2 class="text-3xl font-bold text-ge-accent font-raleway tracking-tight drop-shadow-md">Past Slides Gallery</h2>
+              <p class="text-ge-text-muted mt-1 text-sm">Scroll to review your previous generations</p>
+            </div>
+
+            {#if recentSlides.length === 0}
+              <p class="text-ge-text-muted">No saved slides yet.</p>
+            {:else}
+              <Carousel.Root class="w-full max-w-[95vw]" opts={{ align: "center" }}>
+                <Carousel.Content class="-ms-4 py-8">
+                  {#each recentSlides.slice(0, 20) as slide}
+                    <Carousel.Item class="ps-4 basis-[70%] md:basis-[50%] lg:basis-[35%]">
+                      <div class="p-1 h-full">
+                        <Card.Root class="bg-ge-card border-ge-border/70 shadow-2xl h-full flex flex-col">
+                          <Card.Header class="pb-2 shrink-0">
+                            <Card.Title class="text-ge-accent font-raleway truncate text-2xl">{slide.title}</Card.Title>
+                            <Card.Description class="text-xs text-ge-text-muted flex items-center gap-2">
+                              <span>{slide.date}</span> 
+                              <span>·</span> 
+                              <span>{(slide.size / 1024).toFixed(0)}KB</span>
+                            </Card.Description>
+                          </Card.Header>
+                          <Card.Content class="flex-grow p-0 relative overflow-hidden bg-white/5 mx-6 mb-4 rounded border border-ge-border/30 h-[55vh]">
+                            <iframe
+                              src="/saved/{slide.filename}"
+                              title={slide.title}
+                              loading="lazy"
+                              class="w-full h-full border-none"
+                              sandbox="allow-scripts allow-same-origin"
+                            ></iframe>
+                            <!-- Intercept clicks so they can scroll -->
+                            <div class="absolute inset-0 z-10" style="background: transparent;"></div>
+                          </Card.Content>
+                          <Card.Footer class="flex justify-center gap-3 pb-6 shrink-0">
+                            <button 
+                              on:click={() => { previewSlideFile = slide; showRecent = false; }}
+                              class="px-5 py-2.5 bg-ge-card border border-ge-border hover:border-ge-accent text-ge-text hover:text-ge-accent font-bold rounded-lg shadow-md transition-all hover:scale-105 flex items-center gap-2"
+                              title="Read the full document in a popup without losing your current work"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                              <span>Preview Fullscreen</span>
+                            </button>
+                            <button 
+                              on:click={() => { previewSlideFile = slide; loadPreviewedToWorkspace(); showRecent = false; }}
+                              class="px-5 py-2.5 bg-ge-success hover:bg-ge-success/90 text-ge-bg font-bold rounded-lg shadow-xl transition-all hover:scale-105 flex items-center gap-2"
+                              title="Load this into your editor"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                              <span>Load</span>
+                            </button>
+                            <button 
+                              on:click={() => deleteRecentSlide(slide.filename)}
+                              class="px-4 py-2.5 bg-ge-card border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 hover:text-red-500 font-bold rounded-lg shadow-md transition-all hover:scale-105 flex items-center justify-center"
+                              title="Delete this saved slide permanently"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            </button>
+                          </Card.Footer>
+                        </Card.Root>
+                      </div>
+                    </Carousel.Item>
+                  {/each}
+                </Carousel.Content>
+                <Carousel.Previous class="text-ge-accent border-ge-border hover:bg-ge-bg hover:text-ge-text scale-150 -left-12" />
+                <Carousel.Next class="text-ge-accent border-ge-border hover:bg-ge-bg hover:text-ge-text scale-150 -right-12" />
+              </Carousel.Root>
+            {/if}
+          </div>
+        </div>
+      {/if}
+
+      {#if showCostHistory}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-30 overflow-y-auto border-r border-ge-border animate-in slide-in-from-left duration-200">
+          <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">Cost Management</h2>
+            <button on:click={() => showCostHistory = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+          </div>
+
+          <div class="bg-ge-bg/40 border border-ge-border/50 rounded-lg p-3 mb-4 flex flex-col gap-2">
+            <div class="flex justify-between items-baseline">
+              <span class="text-xs text-ge-text-muted font-semibold">Accumulated Cost</span>
+              <span class="text-lg font-bold font-mono text-ge-success">${accumulatedCost.toFixed(4)}</span>
+            </div>
+            {#if costResetDate}
+              <div class="text-[9px] text-ge-text-muted">
+                Tracking since: <span class="font-mono text-ge-text">{costResetDate}</span>
+              </div>
+            {/if}
+            <button 
+              on:click={resetAccumulatedCost}
+              class="w-full mt-1.5 py-1.5 bg-ge-card border border-ge-border/80 hover:border-ge-accent hover:text-ge-accent text-ge-text-muted text-[11px] font-bold rounded transition-colors"
+            >
+              Reset Accumulated Cost
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Run History</span>
+            <span class="text-[9px] text-ge-text-muted">{costHistory.length} generations</span>
+          </div>
+
+          {#if costHistory.length === 0}
+            <p class="text-ge-text-muted text-xs italic">No cost entries recorded yet.</p>
           {:else}
-            <div class="flex flex-col gap-1.5 flex-grow">
-              {#each recentSlides as slide}
-                <button
-                  on:click={() => openRecentSlide(slide.filename, slide.title)}
-                  class="text-left bg-ge-bg border border-ge-border rounded p-2.5 hover:border-ge-accent transition-colors group"
-                >
-                  <div class="text-xs font-bold text-ge-text group-hover:text-ge-accent truncate">{slide.title}</div>
-                  <div class="text-[9px] text-ge-text-muted mt-0.5 flex items-center gap-2">
-                    <span>{slide.date}</span>
-                    <span>·</span>
-                    <span>{(slide.size / 1024).toFixed(0)}KB</span>
+            <div class="flex flex-col gap-2 overflow-y-auto pr-1">
+              {#each costHistory as entry (entry.id)}
+                <div class="bg-ge-bg/30 border border-ge-border/30 rounded p-2 text-xs flex flex-col gap-1">
+                  <div class="flex justify-between items-baseline gap-2">
+                    <span class="text-[10px] font-mono text-ge-text-muted truncate flex-grow" title={entry.prompt}>{entry.prompt}</span>
+                    <span class="font-mono font-bold text-ge-success shrink-0">${entry.cost.toFixed(4)}</span>
                   </div>
-                </button>
+                  <div class="text-[8px] text-ge-text-muted font-mono">{entry.date}</div>
+                </div>
               {/each}
             </div>
           {/if}
@@ -1118,48 +1559,10 @@ isThinking = false;
     </div>
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
-    <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
-      <div class="w-20"></div>
-      
-      <!-- Slide controls in the center -->
-      <div class="flex items-center gap-2 text-xs">
-        <button
-          class="p-1 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7 text-ge-text"
-          disabled={slides.length === 0 || currentSlideIndex <= 0}
-          on:click={() => { if (currentSlideIndex > 0) { currentSlideIndex--; iframeSrcDoc = slides[currentSlideIndex].html; } }}
-          title="Previous Slide"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <span class="font-mono text-ge-text-muted select-none min-w-[70px] text-center">
-          {slides.length ? currentSlideIndex + 1 : 0} / {slides.length}
-        </span>
-        <button
-          class="p-1 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7 text-ge-text"
-          disabled={slides.length === 0 || currentSlideIndex >= slides.length - 1}
-          on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
-          title="Next Slide"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
-      </div>
 
-      <div class="flex gap-2 items-center">
-        {#if slides.length > 0}
-          {#if isEditMode}
-            <button class="text-xs px-2 py-1 bg-ge-success/20 border border-ge-success text-ge-success rounded hover:bg-ge-success/30 transition-colors" on:click={captureEdits} title="Save edits to this slide">Save Edits</button>
-            <button class="text-xs px-2 py-1 bg-ge-accent/20 border border-ge-accent text-ge-accent rounded hover:bg-ge-accent/30 transition-colors" on:click={applyEditsEverywhere} title="Send edited slide to agent to replicate across all slides">Apply Everywhere</button>
-          {/if}
-          <button class="text-xs px-2 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={toggleEditMode} title="Toggle inline editing">{isEditMode ? 'Exit Edit' : 'Edit'}</button>
-        {/if}
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => exportPdf(false)} title="Export print-friendly PDF (light)">PDF</button>
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => exportPdf(true)} title="Export branded PDF (keeps dark colors)">PDF (Dark)</button>
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={exportHtml}>HTML</button>
-      </div>
-    </div>
-
-    <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
-      <div class="w-full h-full max-w-6xl bg-transparent rounded shadow-2xl border border-ge-border/30 overflow-hidden relative" style="aspect-ratio: 16/9;">
+    <div class="flex-grow p-1 md:p-2 flex items-center justify-center overflow-hidden relative">
+       <!-- Preview Container -->
+       <div class="w-full h-full bg-transparent rounded shadow-2xl border border-ge-border/70 overflow-hidden relative group">
         <iframe
           bind:this={iframeElement}
           title="Slide Preview"
@@ -1167,8 +1570,137 @@ isThinking = false;
           class="w-full h-full bg-transparent"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
+
+        {#if slides.length > 0}
+          <!-- Left slide navigation arrow -->
+          <button
+            class="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full border border-ge-border bg-ge-bg/90 text-ge-text hover:bg-ge-accent hover:border-ge-accent hover:text-ge-bg hover:scale-105 transition-all shadow-lg cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
+            disabled={currentSlideIndex <= 0}
+            on:click={() => { if (currentSlideIndex > 0) { currentSlideIndex--; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+            title="Previous Slide"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+
+          <!-- Right slide navigation arrow -->
+          <button
+            class="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full border border-ge-border bg-ge-bg/90 text-ge-text hover:bg-ge-accent hover:border-ge-accent hover:text-ge-bg hover:scale-105 transition-all shadow-lg cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
+            disabled={currentSlideIndex >= slides.length - 1}
+            on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+            title="Next Slide"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+
+          <!-- Bottom page indicator pill -->
+          <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full border border-ge-border/80 bg-ge-bg/85 text-ge-text-muted font-mono text-xs select-none shadow-md">
+            {currentSlideIndex + 1} / {slides.length}
+          </div>
+
+          <!-- Top-right Edit & Export overlay controls -->
+          <div class="absolute top-4 right-4 z-20 flex gap-2 items-center pointer-events-auto">
+            {#if isEditMode}
+              <button class="text-xs px-2.5 py-1.5 bg-ge-success text-ge-bg font-semibold rounded hover:opacity-90 shadow-md transition-colors" on:click={captureEdits} title="Save edits to this slide">Save Edits</button>
+              <button class="text-xs px-2.5 py-1.5 bg-ge-accent text-ge-bg font-semibold rounded hover:opacity-90 shadow-md transition-colors" on:click={applyEditsEverywhere} title="Send edited slide to agent to replicate across all slides">Apply Everywhere</button>
+            {/if}
+            <button class="text-xs px-3 py-1.5 bg-ge-bg/90 border border-ge-border rounded hover:bg-ge-card text-ge-text shadow-md transition-colors" on:click={toggleEditMode} title="Toggle inline editing">{isEditMode ? 'Exit Edit' : 'Edit'}</button>
+            
+            <!-- Export Dropdown -->
+            <div class="relative">
+              <button on:click|stopPropagation={() => showExportDropdown = !showExportDropdown} class="text-xs px-3 py-1.5 bg-ge-accent text-ge-bg font-bold rounded hover:opacity-90 shadow-md transition-colors flex items-center gap-1.5 cursor-pointer">
+                <span>Export</span>
+                <svg class="transition-transform duration-200" class:rotate-180={showExportDropdown} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              {#if showExportDropdown}
+                <div class="absolute right-0 mt-1 w-48 bg-ge-card border border-ge-border rounded-md shadow-xl z-30 py-1 font-sans text-xs">
+                  <button on:click={() => { exportPdf(false); showExportDropdown = false; }} class="w-full text-left px-3 py-2 text-ge-text hover:bg-ge-bg hover:text-ge-accent transition-colors block cursor-pointer">
+                    Printer Friendly PDF
+                  </button>
+                  <button on:click={() => { exportPdf(true); showExportDropdown = false; }} class="w-full text-left px-3 py-2 text-ge-text hover:bg-ge-bg hover:text-ge-accent transition-colors block cursor-pointer">
+                    Branded PDF (Dark)
+                  </button>
+                  <button on:click={() => { exportHtml(); showExportDropdown = false; }} class="w-full text-left px-3 py-2 text-ge-text hover:bg-ge-bg hover:text-ge-accent transition-colors block cursor-pointer">
+                    HTML Document
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
 
+  <!-- Past Slides Preview Gallery Overlay -->
+  {#if previewSlideFile}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-sans animate-in fade-in duration-200">
+      <div class="bg-ge-card border border-ge-border rounded-xl shadow-2xl flex flex-col w-full max-w-5xl h-[85vh] overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-ge-border/50 shrink-0">
+          <div class="min-w-0 flex-grow mr-4">
+            <h3 class="text-sm font-bold text-ge-accent font-raleway truncate leading-tight">{previewSlideFile.title}</h3>
+            <p class="text-[10px] text-ge-text-muted mt-0.5">
+              Saved on: <span class="font-mono">{previewSlideFile.date}</span> · Size: <span class="font-mono">{(previewSlideFile.size / 1024).toFixed(0)}KB</span>
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              on:click={loadPreviewedToWorkspace}
+              class="px-3.5 py-1.5 bg-ge-success hover:bg-ge-success/90 text-ge-bg font-bold rounded-lg text-xs shadow-md transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              <span>Load in Editor</span>
+            </button>
+            <button 
+              on:click={() => previewSlideFile = null}
+              class="p-1.5 hover:bg-ge-bg rounded-lg text-ge-text-muted hover:text-ge-text transition-colors cursor-pointer"
+              title="Close Preview"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Body: Preview Iframe + Gallery Controls -->
+        <div class="flex-grow min-h-0 relative flex bg-ge-bg/20">
+          <!-- Previous Button -->
+          <button 
+            on:click|stopPropagation={() => cyclePreview(-1)}
+            class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-ge-card/85 hover:bg-ge-card border border-ge-border text-ge-text hover:text-ge-accent rounded-full shadow-lg transition-all hover:scale-105 select-none cursor-pointer"
+            title="Previous File"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+
+          <!-- Iframe Container -->
+          <div class="w-full h-full p-6 flex items-center justify-center">
+            <div class="w-full h-full bg-black/40 border border-ge-border/50 rounded-lg overflow-hidden shadow-inner relative">
+              <iframe 
+                src="/saved/{previewSlideFile.filename}"
+                title="Slide Preview"
+                class="w-full h-full border-none"
+              ></iframe>
+            </div>
+          </div>
+
+          <!-- Next Button -->
+          <button 
+            on:click|stopPropagation={() => cyclePreview(1)}
+            class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-ge-card/85 hover:bg-ge-card border border-ge-border text-ge-text hover:text-ge-accent rounded-full shadow-lg transition-all hover:scale-105 select-none cursor-pointer"
+            title="Next File"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Footer / Keyboard Navigation Help -->
+        <div class="px-4 py-2 bg-ge-card/50 border-t border-ge-border/50 shrink-0 text-center text-[10px] text-ge-text-muted select-none">
+          Click the arrows on either side of the screen to cycle through all saved presentations.
+        </div>
+      </div>
+    </div>
+  {/if}
+
 </main>
+
+<svelte:window on:click={() => showExportDropdown = false} />
