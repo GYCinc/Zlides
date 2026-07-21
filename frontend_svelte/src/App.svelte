@@ -765,8 +765,7 @@
     // Estimate input cost dynamically
     const combinedInputText = textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : "");
     const estimatedInputTokens = (combinedInputText.split(/\s+/).filter(Boolean).length) * 1.5 + (files ? files.length * 3000 : 0);
-    const inputCostRmb = (estimatedInputTokens / 1000000.0) * 0.8;
-    const initialInputCost = inputCostRmb * 2.5 * 0.14;
+    const initialInputCost = (estimatedInputTokens / 1000000.0) * 0.70;
     cost = initialInputCost;
     let totalOutputChars = 0;
 
@@ -828,8 +827,7 @@
                 if (chunkChars > 0) {
                   totalOutputChars += chunkChars;
                   const liveOutputTokens = totalOutputChars / 2.5;
-                  const outputCostRmb = (liveOutputTokens / 1000000.0) * 2.0;
-                  const liveOutputCost = outputCostRmb * 2.5 * 0.14;
+                  const liveOutputCost = (liveOutputTokens / 1000000.0) * 0.70;
                   cost = initialInputCost + liveOutputCost;
                 }
 
