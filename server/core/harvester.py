@@ -1,5 +1,6 @@
 import io
 import math
+import time
 from PIL import Image
 
 def rgb_to_hex(r: int, g: int, b: int) -> str:

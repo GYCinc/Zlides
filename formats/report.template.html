@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Raleway:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+    /* RESET & BASE */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Manrope', sans-serif;
+        background-color: #0f1112;
+        color: #e5e7eb;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .container {
+        max-width: 1152px;
+        margin: 0 auto;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    /* HEADER */
+    header {
+        padding-top: 32px;
+        padding-bottom: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid rgba(255, 107, 53, 0.3);
+    }
+    .header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .header-title-wrap {
+        display: flex;
+        align-items: center;
+    }
+    .header-icon, .section-icon {
+        color: #ff6b35;
+        width: 24px;
+        height: 24px;
+        margin-right: 8px;
+        stroke-width: 1.5px;
+    }
+    .section-icon {
+        width: 20px;
+        height: 20px;
+    }
+    h1 {
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
+        font-size: 24px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+    }
+    .date {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        font-size: 20px;
+        color: #e5e7eb;
+        letter-spacing: -0.05em;
+    }
+
+    /* SECTIONS */
+    section { margin-bottom: 32px; }
+    .section-break { page-break-inside: avoid; }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 107, 53, 0.2);
+        margin-bottom: 12px;
+        padding-bottom: 4px;
+    }
+    h2 {
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
+        font-size: 18px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+        display: flex;
+        align-items: center;
+    }
+    .count-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        font-size: 10px;
+        color: #9ca3af;
+    }
+
+    /* SUMMARY BOX */
+    .summary-box {
+        background-color: #16181a;
+        border: 1px solid rgba(51, 55, 58, 0.3);
+        padding: 16px;
+        position: relative;
+    }
+    .summary-label {
+        position: absolute;
+        top: -8px;
+        left: 16px;
+        background-color: #16181a;
+        padding-left: 8px;
+        padding-right: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 700;
+    }
+
+    /* GRIDS */
+    .grid-4 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .grid-1 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .row-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0 32px;
+    }
+    @media (min-width: 768px) {
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .row-2 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* CARDS */
+    .card {
+        border: 1px solid #3f3f46;
+        background-color: rgba(39, 39, 42, 0.3);
+        padding: 8px 12px;
+        border-left: 1px solid #ff6b35;
+        border-top: 1px solid #33373a;
+    }
+    .card-lg {
+        padding: 12px 16px;
+    }
+    h3 {
+        font-family: 'Manrope', sans-serif;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -0.025em;
+        font-size: 14px;
+        margin-bottom: 4px;
+        line-height: 1.3;
+    }
+    h3.sm { font-size: 12px; }
+    .card p {
+        font-size: 12px;
+        color: #9ca3af;
+        line-height: 1.4;
+    }
+    .card-text-only {
+        font-size: 13px;
+        color: #e5e7eb;
+        line-height: 1.5;
+    }
+
+    .col-span-full { grid-column: 1 / -1; }
+    .sub-header {
+        color: #ff6b35;
+        font-family: 'Raleway', sans-serif;
+        font-size: 14px;
+        margin-bottom: 8px;
+        margin-top: 16px;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+        font-weight: 700;
+    }
+    .sub-header:first-child { margin-top: 0; }
+
+    /* FOOTER */
+    footer {
+        padding: 32px 0;
+        border-top: 1px solid #3f3f46;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .footer-text {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+    }
+
+    @media print {
+        .no-print { display: none; }
+        body { background: white !important; color: black !important; }
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header>
+            <div class="header-flex">
+                <div class="header-title-wrap">
+                    <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v3.5M12 11.5l-5 4M12 11.5l5 4"/></svg>
+                    <h1>Lesson Notes — 07-14-2026 — Yariel</h1>
+                </div>
+                <span class="date">07.14.2026</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Daily Review Summary Section -->
+            <section id="summary">
+                <div class="summary-box">
+                    <div class="summary-label">Summary_Log</div>
+                    <p>
+                        A 55-minute deep dive into commission psychology, discipline philosophy, and the gambler's fallacy. Yariel revealed his core mantra ('the discipline is all') and his agent coaching methodology (diagnostic role-play, not generic advice). Aaron attempted a grammar bridge on 'was vs has been' after momentum on the philosophy wore off. Yariel spoke only 11.2 minutes (21.8%) — Aaron dominated at 78.2%.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Vocabulary Section -->
+            <section class="section-break" id="vocabulary">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+                        Vocabulary
+                    </h2>
+                    <span class="count-label">[COUNT: 10]</span>
+                </div>
+                <div class="grid-4">
+                    <div class="card"><h3 class="sm">above and beyond · phrase · ? (phrase)</h3><p>Doing more than required. Yariel adopted this phrase from the previous session and it anchored the first half of the lesson.</p></div>
+                    <div class="card"><h3 class="sm">fallacy · noun · 18763</h3><p>A false belief that many people hold. Yariel connected it to Spanish 'falacia' — good metacognitive bridging.</p></div>
+                    <div class="card"><h3 class="sm">gambler · noun · 14892</h3><p>Someone who gambles. Yariel had word retrieval trouble: 'And what is gamblers? Gamblers.' — Repeated the word trying to access it.</p></div>
+                    <div class="card"><h3 class="sm">compound · verb/noun · 7654</h3><p>When something builds on itself (like interest). Yariel asked: 'What is compound?' — active vocabulary gap.</p></div>
+                    <div class="card"><h3 class="sm">lands · verb · 2341</h3><p>In sales: successfully gets (a client). Yariel asked: 'lands, what means lands?' — error in question formation but correct target.</p></div>
+                    <div class="card"><h3 class="sm">momentum · noun · 10234</h3><p>Forward movement that builds on itself. Yariel code-switched to Spanish first, then asked for the English word.</p></div>
+                    <div class="card"><h3 class="sm">further · adverb · 5432</h3><p>Additional or more (not physical distance). Yariel asked multiple times: 'Further. How can you say? Further is what? What's mean?'</p></div>
+                    <div class="card"><h3 class="sm">discipline · noun · 3271</h3><p>Self-control, consistent practice. Yariel's core philosophy word — used 5+ times. 'The discipline is all.'</p></div>
+                    <div class="card"><h3 class="sm">commission · noun · 2934</h3><p>Earnings based on sales, not salary. Core to Yariel's professional identity and motivation framework.</p></div>
+                    <div class="card"><h3 class="sm">millennials · noun · 8974</h3><p>Generation born ~1981-1996. Yariel recognized the term but didn't engage deeply with generational analysis.</p></div>
+                </div>
+            </section>
+
+            <div class="row-2">
+                <!-- Phrasal Verbs Section -->
+                <section class="section-break" id="phrasal-verbs">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                            Phrasal Verbs
+                        </h2>
+                        <span class="count-label">[COUNT: 3]</span>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card"><h3 class="sm">quick on your feet</h3><p>To react quickly and adapt. Yariel asked directly: 'Quick on your feet, what is quick on your feet? Another expression... What means this?'</p></div>
+                        <div class="card"><h3 class="sm">end up</h3><p>To finally be in a particular place or situation. Used in casino context: 'end up where you started, so you're at zero.'</p></div>
+                        <div class="card"><h3 class="sm">go above and beyond</h3><p>To do more than expected. Carried over from 07-13 session. Yariel has adopted this phrase.</p></div>
+                    </div>
+                </section>
+
+                <!-- Collocations Section -->
+                <section class="section-break" id="collocations">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            Collocations
+                        </h2>
+                        <span class="count-label">[COUNT: 3]</span>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card"><h3 class="sm">file a claim</h3><p>Yariel explained the process: 'you call your agent, maybe he put a priority the sales to the claims' — natural collocation in his domain</p></div>
+                        <div class="card"><h3 class="sm">build character</h3><p>Used in the failure/success discussion. Yariel: 'if I want to be a strong character, I need to know the success and the failure'</p></div>
+                        <div class="card"><h3 class="sm">role play</h3><p>Yariel uses role-play for agent coaching: 'we made a role play about different situations for practice this reaction'</p></div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="row-2">
+                <!-- Grammar Section -->
+                <section class="section-break" id="grammar">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                            Grammar Rules
+                        </h2>
+                        <span class="count-label">[COUNT: 2]</span>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card"><h3 class="sm">Was vs Has Been (Simple Past vs Present Perfect)</h3><p>Aaron used a bridge metaphor: 'was' = completed/past, 'has been' = ongoing/connected to now. Yariel grasped it: 'It's a type of bridge.' Applied correctly: 'The claim was paused' (finished) vs 'The claim has been paused' (ongoing). Key error pattern: 'The doors are locked right now' — correctly identified the state implication of present perfect.</p></div>
+                        <div class="card"><h3 class="sm">3rd person -s omission + subject-verb agreement</h3><p>Persistent across all chunks: 'your image are freeze' (is frozen), 'he fall in one word' (he falls), 'he don't insist' (doesn't), 'each case is individual. So depend the moment' (depends on). This is Yariel's most systematic error, appearing in EVERY session. Self-correction ('has been or have been' → 'has been') shows monitor is active but inconsistent.</p></div>
+                    </div>
+                </section>
+
+                <!-- Idioms and Phrases Section -->
+                <section class="section-break" id="idioms">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                            Idioms and Phrases
+                        </h2>
+                        <span class="count-label">[COUNT: 3]</span>
+                    </div>
+                    <div class="grid-1">
+                        <div class="card"><h3 class="sm">the discipline is all</h3><p>Yariel's self-created mantra: 'For me, the discipline is all in this way.' 'I need that discipline. The discipline is all. If you have this you have an opportunity to make it a good job.' This is his authentic voice — not a rehearsed phrase.</p></div>
+                        <div class="card"><h3 class="sm">broke even</h3><p>Zero net gain or loss. Used in casino context. Yariel didn't know the term at first: 'What is—' then 'Okay, yeah, okay, even, even.'</p></div>
+                        <div class="card"><h3 class="sm">edge cases</h3><p>Unusual exceptions to a rule. Aaron introduced for grammar: 'the annoying exceptions' that don't follow the 'was vs has been' pattern.</p></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Focus Points Section -->
+            <section class="section-break" id="focus-points">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 3.5 3 6 7 7 4-1 7-3.5 7-7a7 7 0 0 0-7-7z"/></svg>
+                        Focus Points
+                    </h2>
+                    <span class="count-label">[COUNT: 3]</span>
+                </div>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 class="sm">Yariel's discipline philosophy as engagement engine</h3>
+                        <p>'The discipline is all' is his authentic voice and core identity. When the conversation connects to this value, he produces longer, more confident turns. Future sessions should anchor to this value. It's not just a topic — it's who he is.</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="sm">Agent coaching methodology reveals management style</h3>
+                        <p>Yariel doesn't give generic advice. He listens to recordings, diagnoses specific moments ('maybe he fall in one word, one sentence'), and role-plays. This is a rich, untapped vein for session content.</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="sm">False friend alert: 'concord' for 'agree'</h3>
+                        <p>Spanish 'concordar' → English 'concord' (archaic/rare). Should be 'agree' or 'concur.' First time observed. Likely from reading leadership books in Spanish and transferring.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="row-2">
+                <!-- In-Class Practice -->
+                <section class="section-break" id="in-class-practice">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            In-Class Practice
+                        </h2>
+                        <span class="count-label">[COUNT: 2]</span>
+                    </div>
+                    <div class="grid-1">
+                        <div class="card">
+                            <h3 class="sm">Past vs Present Perfect context</h3>
+                            <p>After explaining 'was vs has been' with the bridge metaphor, have Yariel generate his own insurance-based examples: 'The policy was cancelled' vs 'The policy has been cancelled' — what's the difference in meaning?</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">Agent coaching role-play</h3>
+                            <p>Aaron plays a struggling agent, Yariel coaches him. This activates his professional expertise AND produces compelled speech.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Self-Study -->
+                <section class="section-break" id="self-study">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            Self-Study
+                        </h2>
+                        <span class="count-label">[COUNT: 2]</span>
+                    </div>
+                    <div class="grid-1">
+                        <div class="card">
+                            <h3 class="sm">Monitor tense in morning reports</h3>
+                            <p>This week: Notice when you use 'was' vs 'has been' in your morning report. Are you describing something finished or something still relevant? Try using 'has been' at least once when you're describing an ongoing situation.</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">Identify agent coaching moments</h3>
+                            <p>Think of one agent you're currently coaching. What's the one word or sentence where they 'fall'? Bring it to the next session.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Action Items -->
+            <section class="section-break" id="action-items">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        Action Items
+                    </h2>
+                    <span class="count-label">[COUNT: 6]</span>
+                </div>
+                <div class="grid-1">
+                    <div class="sub-header">Yariel's Action Items</div>
+                    <div class="card"><p class="card-text-only">Think about whether you believe failure builds character or success builds momentum — you said both, which is it really?</p></div>
+                    <div class="card"><p class="card-text-only">Try to notice 'further' in any English content you read this week. It usually means 'additional.'</p></div>
+
+                    <div class="sub-header">Aaron's Action Items</div>
+                    <div class="card"><p class="card-text-only">Speaking time: 78.2% — you dominated this session. Yariel spoke 11.2 minutes out of 55. Target: under 40% next session.</p></div>
+                    <div class="card"><p class="card-text-only">The bridge metaphor worked for grammar. Use it again with a new tense pair (e.g., past perfect).</p></div>
+                    <div class="card"><p class="card-text-only">Create a visual PDF for 'was vs has been' with insurance examples and send before next session.</p></div>
+                    <div class="card"><p class="card-text-only">The Tony Robbins documentary recommendation is strong — Yariel likes leadership content. Follow up if he watched it.</p></div>
+                </div>
+            </section>
+
+        </main>
+
+        <div class="no-print">
+            <footer>
+                <p class="footer-text">DATA_ARCHIVE_LES-HUB-ARC</p>
+                <p class="footer-text">NODE: AARON &amp; AiRON // ID: Yariel-07-14-2026 // TIMESTAMP: 07-14-2026</p>
+            </footer>
+        </div>
+    </div>
+</body>
+</html>

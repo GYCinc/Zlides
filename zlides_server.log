@@ -1,0 +1,107 @@
+INFO:     Started server process [364060]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:2828 (Press CTRL+C to quit)
+Binding Zlides server to 127.0.0.1...
+INFO:     127.0.0.1:37358 - "GET /health HTTP/1.1" 200 OK
+[API] Format: lac | Style: gitenglish | Message: Create the Lesson Asset Catalog for this session....
+INFO:     127.0.0.1:37374 - "POST /command HTTP/1.1" 200 OK
+[API] Format: lac | Style: gitenglish | Message: Session 08-04-2026. Student practiced banking voca...
+INFO:     127.0.0.1:48594 - "POST /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59630 - "GET /command HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:59630 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59642 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59642 - "GET /assets/index-6UNL-kXw.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59650 - "GET /assets/index-BBWiVbKg.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59650 - "POST /conversation/clear HTTP/1.1" 200 OK
+[Save] saved_slides/zlides_20260805_025110_Session_08-04-2026_Student_pr.html
+INFO:     127.0.0.1:39490 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "GET /assets/index-Bo5nuyF-.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39502 - "GET /assets/index-D_1_b164.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "GET /styles HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "POST /conversation/clear HTTP/1.1" 200 OK
+[API] Format: lac | Style: gitenglish | Message:  "title": "Lesson Notes — 08-04-2026 — Eliana",
+  ...
+INFO:     127.0.0.1:58790 - "POST /command HTTP/1.1" 200 OK

@@ -58,8 +58,10 @@
   * {
     @apply border-ge-border;
   }
+  html { font-size: 20px; }
   body {
     @apply bg-ge-bg text-ge-text font-inter;
+    font-size: 20px;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-raleway;

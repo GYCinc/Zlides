@@ -13,5 +13,10 @@ export default defineConfig({
   build: {
     outDir: '../public',
     emptyOutDir: true,
+    rollupOptions: {
+      checks: {
+        pluginTimings: false,
+      },
+    },
   },
 })

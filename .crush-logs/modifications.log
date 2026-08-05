@@ -1,0 +1,94 @@
+# Modification Log
+
+## 2026-07-30 (session) — Garbage removal pass
+
+### server/routes/generation.py
+- Removed `/roles` endpoint and `load_role_metadata` import (roles system deleted)
+- Removed `role` field from batch topic payload
+- Removed unused `role_id` argument from `build_system_prompt()` call
+- Kept `{"role": "user"}` — required by Z.AI API message schema
+
+### server/routes/export.py
+- Removed `/export/pdf` endpoint (Playwright PDF export deleted)
+
+### server/core/export.py
+- DELETED (moved to trash) — entire Playwright PDF conversion module
+
+### server/routes/conversation.py
+- Removed all `include_pdf` payload fields (3 occurrences)
+
+### pyproject.toml / requirements.txt
+- Removed `playwright` dependency
+
+### tests/test_slide_server.py
+- Removed 3 Playwright PDF tests
+
+### test_pdf.py
+- DELETED (moved to trash)
+
+### server/core/generator.py
+- Removed `role: str = "balanced"` field from ChatRequest and BatchRequest
+
+### server/core/prompts.py
+- Deleted `ROLES_DIR`, `load_roles()`, `load_role_metadata()`, `DEFAULT_ROLE_PROMPT`, `get_role_prompt()` — all dead code
+- Removed `role_id` parameter from `build_system_prompt()` signature
+
+### server/routes/generation.py (pass 2)
+- Removed invented payload fields from /command: max_tokens, ctrl_step, extra_body (cache_salt/thinking toggle/tool_stream), response_format, requestId, is_edit_request logic
+- Kept only schema-valid fields: agent_id, stream, messages, enable_thinking, tools (web_search), max_pages, conversation_id
+- Accumulator keyed by position only (was tool_name+position) so same-slide fragments combine
+- Added singular `message` fallback alongside `messages`
+- Removed unused secrets/uuid imports
+
+### server/routes/generation.py (pass 3)
+- Removed /estimate-cost endpoint, CostEstimateRequest, estimate_cost() helper (fabricated cost math)
+- Replaced mock /batch with real implementation: added run_generation() helper (same pipeline as /command) that calls Z.AI per prompt; batch now returns real HTML per prompt
+- Removed BatchSlideGenerator import and instantiation
+
+### server/core/generator.py (pass 2)
+- Deleted dead BatchSlideGenerator class (was the mock)
+- Removed unused asyncio import
+
+### frontend_svelte/src/App.svelte
+- Removed SvelteMarkdown import and usage; agent messages now render as plain text (whitespace-pre-wrap) inside SvelteVirtualChat
+- Removed fake cost system: cost state, updateCost(), accumulatedCost/costResetDate/costHistory/showCostHistory, saveGenerationCost(), resetAccumulatedCost(), localStorage cost keys, live cost ticker in SSE loop, Price Estimator card, Cost Management modal
+- Removed /roles fetch from onMount (endpoint deleted)
+- Removed role system: selectedRole, availableRoles, roleOptions state, role fields in /command and /batch request bodies, Personality/Role selector UI
+- Typed two implicit-any event handlers (MouseEvent)
+
+### fix_saved_slides.py
+- DELETED (moved to trash) - leftover of the removed Playwright PDF repair pipeline
+
+### Verified
+- bun run check: only pre-existing WithElementRef errors in ui library remain (untouched)
+- bun run build: OK, bundle 385KB -> 214KB
+- pytest: 2 passed
+
+## 2026-07-30 Doc-VS-Code Decisions (user-approved, one at a time)
+
+1. Conversation State doc: remove "edit requests disable thinking" paragraph; thinking stays ALWAYS on in code.
+2. Request Payload Tuning doc section: DELETE entirely.
+3. Style Bank doc: strip the print-CSS (UNIVERSAL_PRINT_*) sentence only; keep rest of section.
+4. Formats doc: LEAVE formats list as-is. swarm is NOT a real format — DELETE formats/swarm.json (it worked anyway, but not real).
+5. Print & PDF Pipeline doc section: DELETE entirely.
+6. File Upload doc: fix "currently a mock" -> it is a real parser now.
+7. Cost Estimation doc section: DELETE entirely.
+8. Testing doc section: DELETE entirely.
+9. Code Style doc section (single-file claim): DELETE entirely.
+10. Gotchas: DELETE all four stale entries (main.py decoy, edit-keyword list, generate_token mismatch, /batch mock).
+11. Frontend: remove svelte-markdown package + ALL PDF/PNG export UI (dead /export/pdf). HTML export MUST remain fully functional.
+12. Delete stale duplicate build frontend_svelte/dist/.
+13. Rewrite AGENTS.md to match reality after all deletions.
+14. Zlides-Public/: NOT my concern. Never touch, read, or ask about it again. Stay in ZZZlides only.
+
+## 2026-07-31 (continued)
+- Deleted frontend_svelte/dist/ (stale duplicate build, Jun 25) - Q12
+- Deleted formats/swarm.json - Q4 (not a real format)
+- Deleted frontend_svelte/src/assets/ (Vite scaffold: hero.png, svelte.svg, vite.svg) - zero source references
+- Removed exportPdf() + PDF export UI from App.svelte (dead /export/pdf endpoint) - Q11, HTML export untouched
+
+### Correction (same session)
+- Mistakenly renamed frontend_svelte/public -> static and deleted public/ based on misreading user.
+- RESTORED: frontend_svelte/public (favicon.svg + icons.svg), vite outDir='../public', server serves public/index.html + public/assets.
+- public/ is the standard Vite build output folder, NOT the public repo. The public repo is a separate project/repo entirely.
+- Rebuilt: public/ fresh, RR regenerate listener confirmed in bundle.

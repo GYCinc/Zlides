@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Raleway:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+    /* RESET & BASE — no font anywhere below 13px */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Manrope', sans-serif;
+        background-color: #0f1112;
+        color: #e5e7eb;
+        font-size: 15px;
+        line-height: 1.6;
+    }
+    .container {
+        max-width: 1152px;
+        margin: 0 auto;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    /* HEADER */
+    header {
+        padding-top: 32px;
+        padding-bottom: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid rgba(255, 107, 53, 0.3);
+    }
+    .header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .header-title-wrap {
+        display: flex;
+        align-items: center;
+    }
+    .header-icon, .section-icon {
+        color: #ff6b35;
+        width: 24px;
+        height: 24px;
+        margin-right: 8px;
+        stroke-width: 1.5px;
+    }
+    .section-icon {
+        width: 20px;
+        height: 20px;
+    }
+    h1 {
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
+        font-size: 26px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+    }
+    .date {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        font-size: 20px;
+        color: #e5e7eb;
+        letter-spacing: -0.05em;
+    }
+
+    /* SECTIONS */
+    section { margin-bottom: 32px; }
+    .section-break { page-break-inside: avoid; }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 107, 53, 0.2);
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+    }
+    h2 {
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
+        font-size: 19px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+        display: flex;
+        align-items: center;
+    }
+    .count-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #9ca3af;
+    }
+
+    /* SUMMARY BOX */
+    .summary-box {
+        background-color: #16181a;
+        border: 1px solid rgba(51, 55, 58, 0.3);
+        padding: 20px;
+        position: relative;
+    }
+    .summary-box p {
+        font-size: 15px;
+        color: #d1d5db;
+        line-height: 1.7;
+    }
+    .summary-label {
+        position: absolute;
+        top: -9px;
+        left: 16px;
+        background-color: #0f1112;
+        padding-left: 8px;
+        padding-right: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 700;
+    }
+
+    /* GRIDS — vocabulary is 3 wide MAX, never 4 */
+    .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .grid-1 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .row-2 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0 32px;
+    }
+    @media (min-width: 768px) {
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .row-2 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* CARDS */
+    .card {
+        border: 1px solid #2e3236;
+        background-color: #16181a;
+        padding: 12px 14px;
+        border-left: 3px solid #ff6b35;
+        border-radius: 4px;
+    }
+    .card-lg {
+        padding: 14px 16px;
+    }
+    h3 {
+        font-family: 'Manrope', sans-serif;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -0.025em;
+        font-size: 16px;
+        margin-bottom: 6px;
+        line-height: 1.3;
+    }
+    h3.sm { font-size: 15px; }
+    .card p {
+        font-size: 13.5px;
+        color: #d1d5db;
+        line-height: 1.55;
+    }
+    .card-text-only {
+        font-size: 13.5px;
+        color: #e5e7eb;
+        line-height: 1.55;
+    }
+
+    /* CARD META CHIPS — pos always abbreviated (n / v / adj / adv) */
+    .card-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .pos-tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: #ff6b35;
+        background-color: rgba(255, 107, 53, 0.12);
+        padding: 1px 8px;
+        border-radius: 3px;
+        letter-spacing: 0.05em;
+    }
+    .rank-badge {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: #9ca3af;
+        border: 1px solid #33373a;
+        padding: 1px 8px;
+        border-radius: 3px;
+    }
+
+    /* DEFINITION & EXAMPLE — separated by a line, always */
+    .def {
+        font-size: 13.5px;
+        color: #d1d5db;
+        line-height: 1.55;
+    }
+    .ex {
+        font-size: 13px;
+        color: #9ca3af;
+        font-style: italic;
+        border-top: 1px solid rgba(63, 63, 70, 0.6);
+        padding-top: 8px;
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+
+    /* LABELED ROWS — grammar rules and any multi-part card */
+    .kv {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px solid rgba(63, 63, 70, 0.5);
+        align-items: start;
+    }
+    .kv-tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 700;
+        color: #ff6b35;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding-top: 1px;
+    }
+    .kv.trap .kv-tag { color: #fbbf24; }
+    .kv span:last-child {
+        font-size: 13.5px;
+        color: #d1d5db;
+        line-height: 1.55;
+    }
+    .kv.trap span:last-child { color: #e5e7eb; }
+
+    .col-span-full { grid-column: 1 / -1; }
+    .sub-header {
+        color: #ff6b35;
+        font-family: 'Raleway', sans-serif;
+        font-size: 15px;
+        margin-bottom: 8px;
+        margin-top: 16px;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+        font-weight: 700;
+    }
+    .sub-header:first-child { margin-top: 0; }
+
+    /* FOOTER */
+    footer {
+        padding: 32px 0;
+        border-top: 1px solid #3f3f46;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .footer-text {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+    }
+
+    @media print {
+        .no-print { display: none; }
+        body { background: white !important; color: black !important; }
+        .card { border-color: #d1d5db; background: #ffffff; }
+        .card p, .def, .kv span:last-child { color: #1f2937; }
+        .ex { color: #4b5563; border-top-color: #d1d5db; }
+        .pos-tag { border: 1px solid #ff6b35; background: none; }
+        .rank-badge { border-color: #9ca3af; color: #4b5563; }
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header>
+            <div class="header-flex">
+                <div class="header-title-wrap">
+                    <svg class="header-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8v3.5M12 11.5l-5 4M12 11.5l5 4"/></svg>
+                    <h1>Lesson Notes — SESSION_DATE — STUDENT_NAME</h1>
+                </div>
+                <span class="date">SESSION_DATE_SHORT</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Daily Review Summary Section -->
+            <section id="summary">
+                <div class="summary-box">
+                    <div class="summary-label">Summary_Log</div>
+                    <p>
+                        SESSION_SUMMARY_PLACEHOLDER
+                    </p>
+                </div>
+            </section>
+
+            <!-- Vocabulary Section — 3 wide MAX, never 4 -->
+            <section class="section-break" id="vocabulary">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>
+                        Vocabulary
+                    </h2>
+                    <span class="count-label">[COUNT: N]</span>
+                </div>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3 class="sm">omen</h3>
+                        <div class="card-meta"><span class="pos-tag">n</span><span class="rank-badge">14602</span></div>
+                        <p class="def">A sign of what is coming.</p>
+                        <p class="ex">"this is the word that they use."</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="sm">treasure</h3>
+                        <div class="card-meta"><span class="pos-tag">n</span><span class="rank-badge">4106</span></div>
+                        <p class="def">Something of great value you search for.</p>
+                        <p class="ex">"where is that your treasure, right?"</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="sm">declare</h3>
+                        <div class="card-meta"><span class="pos-tag">v</span><span class="rank-badge">1745</span></div>
+                        <p class="def">Officially announce something.</p>
+                        <p class="ex">"the government declare your death."</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="row-2">
+                <!-- Phrasal Verbs Section -->
+                <section class="section-break" id="phrasal-verbs">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                            Phrasal Verbs
+                        </h2>
+                        <span class="count-label">[COUNT: N]</span>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3 class="sm">get away with</h3>
+                            <div class="card-meta"><span class="pos-tag">evade</span><span class="rank-badge">95 / 5</span></div>
+                            <p class="def">Do something wrong without being caught.</p>
+                            <p class="ex">"they think they're going to get away with it" — nobody says "evade consequence" out loud.</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">look into</h3>
+                            <div class="card-meta"><span class="pos-tag">investigate</span><span class="rank-badge">50 / 50</span></div>
+                            <p class="def">Examine something carefully.</p>
+                            <p class="ex">"too interesting not to look into" — warmer than "investigate."</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Collocations Section -->
+                <section class="section-break" id="collocations">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            Collocations
+                        </h2>
+                        <span class="count-label">[COUNT: N]</span>
+                    </div>
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3 class="sm">insurance claim</h3>
+                            <p class="def">Your domain: receive a claim, file a claim.</p>
+                            <p class="ex">The bear costumes were a fake claim for $141,000.</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">incomplete information</h3>
+                            <p class="def">Your own definition of an assumption.</p>
+                            <p class="ex">"you made a decision based on incomplete information."</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Grammar Section — FULL WIDTH, horizontal, one card per row -->
+            <section class="section-break" id="grammar">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        Grammar Rules
+                    </h2>
+                    <span class="count-label">[COUNT: N]</span>
+                </div>
+                <div class="grid-1">
+                    <div class="card card-lg">
+                        <h3 class="sm">3rd person singular -s</h3>
+                        <p class="def">After he/she/it, the verb takes -s. The #1 pattern for your professional accuracy.</p>
+                        <div class="kv"><span class="kv-tag">ALT</span><span>Base verb after I/you/we/they. Add -s/-es after he/she/it/the boss/the company.</span></div>
+                        <div class="kv"><span class="kv-tag">EX</span><span>"the part that put the people" → "the part that puts people"</span></div>
+                        <div class="kv"><span class="kv-tag">EX</span><span>"your boss talk to you" → "your boss talks to you"</span></div>
+                        <div class="kv trap"><span class="kv-tag">TRAP</span><span>The -s drops in fast speech — pause and check after every he/she/it verb: boss talks, family has.</span></div>
+                    </div>
+                    <div class="card card-lg">
+                        <h3 class="sm">for + infinitive vs to + infinitive</h3>
+                        <p class="def">Purpose after a verb needs "to", not "for". Spanish "para" transfers as "for receive" — English uses "to receive."</p>
+                        <div class="kv"><span class="kv-tag">ALT</span><span>"For" takes a noun ("for the claim"). "To" takes a verb ("to receive").</span></div>
+                        <div class="kv"><span class="kv-tag">EX</span><span>"for receive the claim" → "to receive the claim"</span></div>
+                        <div class="kv"><span class="kv-tag">EX</span><span>"for declare a person dead" → "to declare a person dead"</span></div>
+                        <div class="kv trap"><span class="kv-tag">TRAP</span><span>If a verb follows the gap, it's "to", not "for" — every time.</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Idioms and Phrases Section -->
+            <section class="section-break" id="idioms">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        Idioms and Phrases
+                    </h2>
+                    <span class="count-label">[COUNT: N]</span>
+                </div>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3 class="sm">catch-22</h3>
+                        <div class="card-meta"><span class="pos-tag">informal</span></div>
+                        <p class="def">A situation where every choice is bad.</p>
+                        <p class="ex">Loving travel but hating starting over — stuck either way.</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="sm">came full circle</h3>
+                        <div class="card-meta"><span class="pos-tag">informal</span></div>
+                        <p class="def">Ended up back where you started.</p>
+                        <p class="ex">The family in the photo from 10 years before, in the same house.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Focus Points Section — FULL WIDTH, horizontal, one card per row -->
+            <section class="section-break" id="focus-points">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 3.5 3 6 7 7 4-1 7-3.5 7-7a7 7 0 0 0-7-7z"/></svg>
+                        Focus Points
+                    </h2>
+                    <span class="count-label">[COUNT: N]</span>
+                </div>
+                <div class="grid-1">
+                    <div class="card card-lg">
+                        <h3 class="sm">Present perfect — the rope</h3>
+                        <p class="def">"I have + verb" means the past is still tied to you, like a rope. I've read good books = they're still with me. I've lost my keys = it still affects me. Open box (still relevant) vs closed box (finished). Don't force it — notice every "I've" in the book and ask: is it still tied to me?</p>
+                    </div>
+                    <div class="card card-lg">
+                        <h3 class="sm">Assumptions — "you think for other people"</h3>
+                        <p class="def">Your cleanest definition of the session: when you take the position of assumption, you think for other people, based on incomplete information. You chose this as Four Agreements #2 and connected it to your work: words carry authority from a leader, and tone changes how they're received.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="row-2">
+                <!-- In-Class Practice -->
+                <section class="section-break" id="in-class-practice">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            In-Class Practice
+                        </h2>
+                        <span class="count-label">[COUNT: N]</span>
+                    </div>
+                    <div class="grid-1">
+                        <div class="card">
+                            <h3 class="sm">PRACTICE_ACTIVITY_TITLE</h3>
+                            <p class="def">Description of the practice activity.</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">PRACTICE_ACTIVITY_TITLE</h3>
+                            <p class="def">Description of the practice activity.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Self-Study -->
+                <section class="section-break" id="self-study">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            Self-Study
+                        </h2>
+                        <span class="count-label">[COUNT: N]</span>
+                    </div>
+                    <div class="grid-1">
+                        <div class="card">
+                            <h3 class="sm">SELF_STUDY_TASK_TITLE</h3>
+                            <p class="def">Concrete task for independent practice.</p>
+                        </div>
+                        <div class="card">
+                            <h3 class="sm">SELF_STUDY_TASK_TITLE</h3>
+                            <p class="def">Concrete task for independent practice.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Action Items -->
+            <section class="section-break" id="action-items">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        Action Items
+                    </h2>
+                    <span class="count-label">[COUNT: N]</span>
+                </div>
+                <div class="grid-1">
+                    <div class="card card-lg">
+                        <p class="def">ACTION_ITEM_1</p>
+                    </div>
+                    <div class="card card-lg">
+                        <p class="def">ACTION_ITEM_2</p>
+                    </div>
+                </div>
+            </section>
+
+            <footer>
+                <div class="footer-text">Generated by Zlides</div>
+                <div class="footer-text">gitEnglish · Lesson Asset Catalog</div>
+            </footer>
+        </main>
+    </div>
+</body>
+</html>

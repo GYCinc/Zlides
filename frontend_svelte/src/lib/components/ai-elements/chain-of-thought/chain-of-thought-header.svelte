@@ -18,7 +18,7 @@
 
 <CollapsibleTrigger
 	class={cn(
-		"text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors",
+		"text-ge-text-muted hover:text-ge-text flex w-full items-center gap-2 text-sm transition-colors",
 		className
 	)}
 >

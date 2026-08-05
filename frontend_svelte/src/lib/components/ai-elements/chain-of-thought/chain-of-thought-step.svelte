@@ -32,9 +32,9 @@
 	let element: HTMLDivElement;
 
 	const statusStyles = {
-		complete: "text-muted-foreground",
-		active: "text-foreground",
-		pending: "text-muted-foreground/50",
+		complete: "text-ge-text-muted",
+		active: "text-ge-text",
+		pending: "text-ge-text-muted/50",
 	};
 
 	// Calculate step index based on DOM position
@@ -78,7 +78,7 @@
 	<div class="flex-1 space-y-2">
 		<div>{label}</div>
 		{#if description}
-			<div class="text-muted-foreground text-xs">{description}</div>
+			<div class="text-ge-text-muted text-xs">{description}</div>
 		{/if}
 		{#if children}
 			{@render children()}

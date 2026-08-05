@@ -19,6 +19,6 @@
 		{@render children()}
 	</div>
 	{#if caption}
-		<p class="text-muted-foreground text-xs">{caption}</p>
+		<p class="text-ge-text-muted text-xs">{caption}</p>
 	{/if}
 </div>

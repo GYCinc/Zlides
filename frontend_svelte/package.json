@@ -10,7 +10,6 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {
-    "@internationalized/date": "^3.12.2",
     "@lucide/svelte": "^1.25.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
@@ -26,12 +25,9 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
-    "@humanspeak/svelte-markdown": "^1.8.4",
-    "@humanspeak/svelte-virtual-chat": "^0.1.16",
+    "@humanspeak/svelte-virtual-chat": "^0.1.22",
     "@tailwindcss/typography": "^0.5.20",
     "clsx": "^2.1.1",
-    "lucide-svelte": "^1.0.1",
-    "mermaid": "^11.15.0",
     "tailwind-merge": "^3.6.0"
   }
 }

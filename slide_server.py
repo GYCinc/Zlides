@@ -6,7 +6,6 @@ from server.core.state import sanitize_html
 
 # Export version for uvicorn/pytest compatibility
 from server.core.state import VERSION, generate_token
-from server.core.export import PLAYWRIGHT_AVAILABLE
 
 if __name__ == "__main__":
     # Local binding only
