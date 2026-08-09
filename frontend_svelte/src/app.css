@@ -14,6 +14,8 @@
 
   --font-inter: 'Inter', system-ui, sans-serif;
   --font-raleway: 'Raleway', 'Inter', sans-serif;
+  --font-outfit: 'Outfit', 'Raleway', sans-serif;
+  --font-roboto: 'Roboto', 'Inter', system-ui, sans-serif;
 }
 
 @layer base {

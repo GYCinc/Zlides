@@ -1,6 +1,0 @@
-{
-  "id": "poster",
-  "name": "Poster",
-  "description": "Single-page visual poster",
-  "prompt": "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense."
-}

@@ -6,10 +6,6 @@ from PIL import Image
 def rgb_to_hex(r: int, g: int, b: int) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
-def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
-    hex_str = hex_str.lstrip('#')
-    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
-
 def get_lightness(r: int, g: int, b: int) -> float:
     # Standard relative luminance formula
     return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0

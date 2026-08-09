@@ -1,23 +1,25 @@
 {
   "id": "gitenglish",
   "name": "gitEnglish Hub",
-  "created_at": "2026-03-31",
-  "brand_png": "gitenglish-brand.png",
-  "preview_colors": ["#0f1112", "#16181a", "#ff6b35", "#8a1c00", "#e5e7eb"],
-  "prompt_hint": "Use a dark, premium editorial theme. Background `#0f1112`, card background `#16181a` (or `rgba(39, 39, 42, 0.3)`), accent color `#ff6b35` (burnt mandarin), secondary text `#9ca3af`, primary text `#e5e7eb`, border `#3f3f46`. Typography: Body uses system-ui. Headings MUST use 'Raleway' font, weight 800 (black), and uppercase. Do NOT use tight letter-spacing or negative word-spacing; keep the spacing readable. ACCENT GRADIENT: Use a subtle gradient from burnt mandarin (#ff6b35) to burnt blood (#8a1c00) for structural accents like thin left-borders on cards (3-4px), subtle dividers under section headers. Layout Elements: Use a `.summary-box` class with a thin border and an absolutely positioned top-left `.summary-label` (uppercase, monospace, accent color). Use `.card` classes with the gradient left-border and flat backgrounds. All CSS must be inline in a single <style> tag. ICONS: Add these explicit CSS rules for SVG icons to make them large and premium: `svg { width: 32px; height: 32px; stroke-width: 2px; color: #ff6b35; margin-right: 12px; vertical-align: middle; }`. Do NOT use basic emojis, use clean, professional inline SVGs (like Lucide style) and apply the SVG sizing CSS.",
+  "prompt_hint": "Use a dark, premium editorial theme. Background `#0f1112`, card background `#16181a` (or `rgba(39, 39, 42, 0.3)`), accent color `#ff6b35` (burnt mandarin), secondary text `#9ca3af`, primary text `#e5e7eb`, border `#3f3f46`. TYPOGRAPHY RULES: Body and all metadata tags/chips use 'Roboto' sans-serif (17px). Headings use 'Outfit' font, weight 800 (H1=34px, H2=24px, H3=20px). DO NOT use monospace fonts or technical developer fonts anywhere. MINIMUM FONT SIZE: No text, metadata chip, rank badge, or label anywhere on the page can be smaller than 15px. ACCENT GRADIENT: Use a subtle gradient from burnt mandarin (#ff6b35) to burnt blood (#8a1c00) for structural accents like thin left-borders on cards (3-4px), subtle dividers under section headers. Layout Elements: Use a `.summary-box` class with a thin border and an absolutely positioned top-left `.summary-label` (uppercase, Roboto font, accent color). Use `.card` classes with the gradient left-border and flat backgrounds. All CSS must be inline in a single <style> tag. ICONS: Add these explicit CSS rules for SVG icons to make them large and premium: `svg { width: 32px; height: 32px; stroke-width: 2px; color: #ff6b35; margin-right: 12px; vertical-align: middle; }`. Do NOT use basic emojis, use clean, professional inline SVGs (like Lucide style) and apply the SVG sizing CSS.",
   "css": {
     "bg": "#0f1112",
     "card": "#16181a",
     "text": "#e5e7eb",
-    "text_secondary": "#9ca3af",
+    "text_secondary": "#4400ff",
     "accent": "#ff6b35",
-    "accent_blood": "#8a1c00",
-    "border": "#3f3f46"
+    "accent_hover": "#aabff8",
+    "border": "#3f3f46",
+    "success": "#16a34a",
+    "danger": "#dc2626"
   },
-  "fonts": {
-    "body": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    "heading": "'Raleway', system-ui, sans-serif"
-  },
-  "card_style": "flat",
-  "print_css": "@media print { body { background: #fff !important; color: #333 !important; } .ge-card, .card, .summary-box { background: #f9f9f9 !important; border: 1px solid #ccc !important; box-shadow: none !important; } .ge-accent, svg { color: #cc5500 !important; } button[id='regenerate'] { display: none !important; } @page { margin: 1.5cm; size: A4; break-inside: avoid; } }"
+  "preview_colors": [
+    "#0f1112",
+    "#16181a",
+    "#ff6b35",
+    "#e5e7eb"
+  ],
+  "created_at": "2026-08-08",
+  "fonts": {},
+  "print_css": "@media print { @page { size: A4 portrait; margin: 12mm; } body { background: #fff !important; color: #111 !important; } .container { max-width: 100% !important; width: 100% !important; padding: 0 !important; } .card, .summary-box, .section-break { break-inside: avoid !page-break-inside: avoid; } button[id='regenerate'] { display: none !important; } }"
 }

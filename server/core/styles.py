@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from server.core.state import STYLE_BANK_DIR, FONT_DIR
 
 def load_style_bank() -> dict:

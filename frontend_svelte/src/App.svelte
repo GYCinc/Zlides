@@ -21,6 +21,7 @@
   let costResetDate = $state("");
   let costHistory = $state<any[]>([]);
   let costSavedForThisRun = false;
+  let currentConversationId = $state<string | null>(null);
 
   function saveGenerationCost(prompt: string, finalCost: number) {
     accumulatedCost += finalCost;
@@ -76,6 +77,22 @@
       } catch (e) {
         costHistory = [];
       }
+    }
+
+    // Load formats from the backend
+    try {
+      const resp = await fetch("/formats");
+      availableFormats = await resp.json();
+    } catch (e) {
+      console.warn("Could not load formats:", e);
+      availableFormats = [
+        { id: "slides", name: "Slides" },
+        { id: "report", name: "Document" },
+        { id: "web", name: "Web Page" },
+        { id: "lac", name: "LAC (Lesson Asset Catalog)" },
+        { id: "worksheet", name: "Worksheet" },
+        { id: "guide", name: "Guide" }
+      ];
     }
 
     // Load styles from the backend
@@ -174,46 +191,16 @@
   let msgIdCounter = $state(0);
   function nextId() { return `msg-${++msgIdCounter}`; }
   let chatMessages = $state<any[]>([]);
-  let selectedLayout = $state("slides");
-  let selectedContentLayout = $state("auto");
-  let selectedStyle = $state("auto");
-  let pageCount = $state<number | null>(null);
+  let availableFormats = $state<any[]>([]);
+  let selectedLayout = $state("document");
+  let selectedFormat = $state("lac");
   let availableStyles = $state<any[]>([]);
+  let selectedStyle = $state("gitenglish");
+  let pageCount = $state<number | null>(null);
 
-  // Layout Shape options
-  const layoutShapeOptions = [
-    { id: "slides", name: "Slides" },
-    { id: "document", name: "Document" },
-    { id: "web page", name: "Web Page" }
-  ];
-
-  // Content Layout options
-  const contentLayoutOptions = [
-    { id: "auto", name: "Auto" },
-    { id: "worksheet", name: "Worksheet" },
-    { id: "report", name: "Report" },
-    { id: "lac", name: "LAC" },
-    { id: "rr", name: "RR (RegenResource)" }
-  ];
-
-  let styleOptions = $derived([
-    { id: "auto", name: "Auto" },
-    ...availableStyles.filter(s => s.id !== "auto")
-  ]);
-
-  // Map to API values
+  // Map directly to API values from library selection
   let apiStyle = $derived(selectedStyle);
-  let apiFormat = $derived(
-    selectedContentLayout !== "auto"
-      ? selectedContentLayout
-      : selectedLayout === "slides"
-      ? "slides"
-      : selectedLayout === "document"
-      ? "report"
-      : selectedLayout === "web page"
-      ? "poster"
-      : "slides"
-  );
+  let apiFormat = $derived(selectedFormat);
 
   let showStyleEditor = $state(false);
   let showAdvancedColors = $state(false);
@@ -242,6 +229,46 @@
   let editingStyleAccentHover = $state("#1d4ed8");
 
   let previewSlideFile = $state<any>(null);
+
+  async function openStyleEditor(styleId?: string) {
+    const targetId = styleId || selectedStyle;
+    if (targetId && targetId !== "auto") {
+      try {
+        const resp = await fetch(`/styles/${targetId}`);
+        if (resp.ok) {
+          const s = await resp.json();
+          editingStyleId = s.id || targetId;
+          editingStyleName = s.name || targetId;
+          editingStylePromptHint = s.prompt_hint || "";
+          const css = s.css || {};
+          editingStyleBg = css.bg || "#ffffff";
+          editingStyleCard = css.card || "#f8f9fa";
+          editingStyleText = css.text || "#1e293b";
+          editingStyleAccent = css.accent || "#2563eb";
+          editingStyleTextSecondary = css.text_secondary || "#64748b";
+          editingStyleBorder = css.border || "#e2e8f0";
+          editingStyleSuccess = css.success || "#16a34a";
+          editingStyleDanger = css.danger || "#dc2626";
+          editingStyleAccentHover = css.accent_hover || "#1d4ed8";
+          showStyleEditor = true;
+          return;
+        }
+      } catch (e) {}
+    }
+    editingStyleId = `custom-style-${Date.now()}`;
+    editingStyleName = "Custom Style";
+    editingStylePromptHint = "";
+    editingStyleBg = "#18181b";
+    editingStyleCard = "#27272a";
+    editingStyleText = "#f4f4f5";
+    editingStyleAccent = "#ff6600";
+    editingStyleTextSecondary = "#a1a1aa";
+    editingStyleBorder = "#3f3f46";
+    editingStyleSuccess = "#22c55e";
+    editingStyleDanger = "#ef4444";
+    editingStyleAccentHover = "#ea580c";
+    showStyleEditor = true;
+  }
 
   function cyclePreview(direction: number) {
     if (!previewSlideFile || recentSlides.length <= 1) return;
@@ -361,6 +388,7 @@
       const resp = await fetch("/conversation/clear", { method: "POST" });
       if (resp.ok) {
         chatMessages = [{ id: nextId(), role: "agent", text: "Ready! New conversation started. Pick a format + style, describe what you want." }];
+        currentConversationId = null;
         liveHtmlPages = [];
         slides = [];
         currentSlideIndex = 0;
@@ -506,10 +534,37 @@
     return text
       .replace(/\[([^\]]*)\]\(([^)]*)\)/g, '$1')
       .replace(/^#{1,6}\s*/gm, '')
+      .replace(/(^|\n)\s*[*+-]\s+/gm, '$1')
+      .replace(/(^|\n)\s*\d+\.\s+/gm, '$1')
       .replace(/(\*\*|__)(.*?)\1/g, '$2')
       .replace(/(^|\W)\*([^*\n]+)\*/g, '$1$2')
       .replace(/`([^`]*)`/g, '$1')
       .trim();
+  }
+
+  function ensureScrollableHtml(html: string): string {
+    if (!html) return '';
+    if (!html.includes('id="zlides-scroll-fix"')) {
+      const scrollFix = `<style id="zlides-scroll-fix">html, body { overflow-y: auto !important; height: auto !important; min-height: 100vh; }</style>`;
+      if (html.includes('</head>')) {
+        return html.replace('</head>', `${scrollFix}</head>`);
+      } else if (html.includes('<style>')) {
+        return html.replace('<style>', `<style>${scrollFix}`);
+      } else {
+        return scrollFix + html;
+      }
+    }
+    return html;
+  }
+
+  function handleIframeLoad() {
+    if (iframeElement?.contentDocument?.documentElement) {
+      iframeElement.contentDocument.documentElement.style.overflowY = 'auto';
+    }
+    if (iframeElement?.contentDocument?.body) {
+      iframeElement.contentDocument.body.style.overflowY = 'auto';
+      iframeElement.contentDocument.body.style.height = 'auto';
+    }
   }
 
   function renderLiveHtmlChunks() {
@@ -607,6 +662,7 @@
           message: textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : ""),
           format: apiFormat,
           style: apiStyle,
+          conversation_id: currentConversationId || undefined,
           system_prompt: requestSystemPrompt || undefined,
           page_count: pageCount,
           api_key: customApiKey || undefined,
@@ -647,17 +703,15 @@
                 }
 
                 if (data.type === 'thinking') {
-                  thinkingBuffer += textContent;
-                  const paragraphBreak = thinkingBuffer.indexOf('\n\n');
-                  const singleBreak = thinkingBuffer.lastIndexOf('\n');
-                  if (paragraphBreak !== -1) {
-                    const batch = thinkingBuffer.substring(0, paragraphBreak).trim();
-                    if (batch) thoughts = [...thoughts, batch];
-                    thinkingBuffer = thinkingBuffer.substring(paragraphBreak + 2);
-                  } else if (thinkingBuffer.length > 150 && singleBreak !== -1) {
-                    const batch = thinkingBuffer.substring(0, singleBreak).trim();
-                    if (batch) thoughts = [...thoughts, batch];
-                    thinkingBuffer = thinkingBuffer.substring(singleBreak + 1);
+                  const chunkText = textContent || '';
+                  if (chunkText) {
+                    thinkingBuffer += chunkText;
+                    if (thoughts.length === 0) {
+                      thoughts = [thinkingBuffer];
+                    } else {
+                      thoughts[thoughts.length - 1] = thinkingBuffer;
+                      thoughts = [...thoughts];
+                    }
                   }
                 }
 
@@ -763,17 +817,45 @@
                     thinkingBuffer = '';
                   }
 
-                                    isThinking = false;
+                  isThinking = false;
 
                   const html = data.html;
-                  iframeSrcDoc = html;
-                  slides = [...slides, { html, title: textToSend }];
-                  currentSlideIndex = slides.length - 1;
-                  addMessage(`Done! Your ${apiFormat} is ready to view.`, 'agent');
-                  status = 'Done!';
+                  if (liveHtmlPages.length > 1) {
+                    const sortedPages = [...liveHtmlPages].sort((a, b) => {
+                      const len = Math.min(a.position.length, b.position.length);
+                      for (let i = 0; i < len; i++) {
+                        if (a.position[i] !== b.position[i]) {
+                          return a.position[i] - b.position[i];
+                        }
+                      }
+                      return a.position.length - b.position.length;
+                    });
+                    slides = sortedPages.map((p, idx) => ({
+                      html: p.html,
+                      title: `${textToSend} (Page ${idx + 1})`
+                    }));
+                    currentSlideIndex = 0;
+                    iframeSrcDoc = sortedPages[0].html;
+                  } else {
+                    iframeSrcDoc = html;
+                    slides = [...slides, { html, title: textToSend }];
+                    currentSlideIndex = slides.length - 1;
+                  }
+
+                  if (data.conversation_id) {
+                    currentConversationId = data.conversation_id;
+                  }
+
+                  const totTokens = data.total_tokens || 0;
+                  const promptTk = data.prompt_tokens || 0;
+                  const compTk = data.completion_tokens || 0;
+                  const costVal = data.cost_usd ? `$${data.cost_usd.toFixed(4)}` : '$0.0000';
+                  
+                  addMessage(`Done! Your ${apiFormat} is ready. Used ${totTokens.toLocaleString()} tokens (Prompt: ${promptTk.toLocaleString()} | Output: ${compTk.toLocaleString()}) — Cost: ${costVal}.`, 'agent');
+                  status = `Done (${totTokens.toLocaleString()} tkns)`;
                   cost = data.cost_usd ?? 0;
                   costIsEstimate = false;
-                  usageInfo = { prompt_tokens: data.prompt_tokens, completion_tokens: data.completion_tokens, total_tokens: data.total_tokens };
+                  usageInfo = { prompt_tokens: promptTk, completion_tokens: compTk, total_tokens: totTokens };
 
                   isGenerating = false;
                   currentController = null;
@@ -818,86 +900,108 @@
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
   <div class="w-full md:w-[640px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
-    <div class="flex-shrink-0 flex items-center justify-between border-b border-ge-border/30 pb-3 mb-1">
-      <div class="flex flex-col gap-0.5">
-        <div class="flex items-end gap-2.5">
-          <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway select-none leading-none">
+    <!-- Consolidated Space-Efficient Top Header Toolbar -->
+    <div class="flex-shrink-0 flex flex-col gap-2.5 border-b border-ge-border/30 pb-3 mb-1">
+      <div class="flex items-center justify-between gap-2">
+        <!-- Cool Logo & Tagline -->
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-2xl font-extrabold tracking-tight font-outfit select-none leading-none text-transparent bg-clip-text bg-gradient-to-r from-ge-accent via-amber-400 to-orange-400 drop-shadow-xs">
             Zlides
           </h1>
-          <span class="text-xs font-mono text-ge-text-muted/70 italic tracking-wider mb-0.5 select-none">Drop vibes. Get Zlides.</span>
-        </div>
-        {#if cost > 0 || accumulatedCost > 0}
-          <div class="flex items-center gap-2 mt-2 text-xs font-mono text-ge-accent" title="Total spent (since {costResetDate || 'first run'}) / this run. Real tokens billed by Z.AI at 0.70 USD per 1M tokens — 'est.' is a rough pre-run guess, replaced by Tokenizer API numbers during the run.">
-            <span class="bg-ge-bg border border-ge-border rounded px-2 py-0.5 font-bold text-ge-success">${accumulatedCost.toFixed(4)}</span>
-            <span class="text-ge-text-muted">total /</span>
-            <span class="bg-ge-bg border border-ge-border rounded px-2 py-0.5 font-bold">${cost.toFixed(4)}</span>
-            <span class="text-ge-text-muted">this run{costIsEstimate && cost > 0 ? ' (est.)' : ''}</span>
-            <button onclick={resetAccumulatedCost} class="text-ge-text-muted hover:text-ge-danger transition-colors cursor-pointer" title="Reset accumulated total to zero">
-              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            </button>
-            {#if usageInfo && !costIsEstimate}
-              <span class="text-ge-text-muted">in {usageInfo.prompt_tokens ?? 0} / out {usageInfo.completion_tokens ?? 0} tok</span>
-            {/if}
-          </div>
-        {/if}
-        <div class="flex items-center gap-3 mt-3">
-          <Button variant="outline" size="icon" onclick={startNewConversation} title="Reset Conversation">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-          </Button>
-          <Button variant="outline" size="icon" onclick={loadRecent} title="Recent Files">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-          </Button>
-          <Button variant="outline" size="icon" onclick={openPreferences} title="Preferences">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-          </Button>
-          <Button variant="outline" size="icon" onclick={() => showApiSettings = true} title="API Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </Button>
+          <span class="text-[11px] font-roboto font-medium text-ge-accent/80 italic tracking-wider select-none">Drop vibes. Get Zlides.</span>
         </div>
 
-        <!-- Export Dropdown — moved to controls row below -->
+        <!-- Right-hand Action Group & Scooted Cost & Token Counter -->
+        <div class="flex items-center gap-1.5">
+          <div class="inline-flex items-center gap-2 bg-ge-bg/70 border border-ge-border/70 rounded-lg px-2.5 py-1 text-xs font-mono text-ge-accent shadow-xs mr-1" title={usageInfo ? `Prompt: ${usageInfo.prompt_tokens || 0} | Completion: ${usageInfo.completion_tokens || 0} | Total: ${usageInfo.total_tokens || 0}` : "Session token counter. Billed by Z.AI at $0.70 / 1M tokens."}>
+            <span class="text-ge-text-muted text-[10px] uppercase font-bold tracking-wider select-none">Tokens</span>
+            <span class="font-bold text-ge-accent font-roboto">{usageInfo?.total_tokens ? `${(usageInfo.total_tokens / 1000).toFixed(1)}k` : '0k'}</span>
+            <span class="text-ge-text-muted text-[10px] uppercase font-bold tracking-wider select-none border-l border-ge-border/50 pl-1.5">Cost</span>
+            <span class="font-bold text-ge-success font-roboto">${accumulatedCost.toFixed(4)}</span>
+            <button 
+              onclick={resetAccumulatedCost} 
+              class="text-ge-text-muted hover:text-ge-danger transition-colors cursor-pointer p-0.5 rounded hover:bg-ge-card/50" 
+              title="Reset token and cost counter to zero"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+          </div>
+
+          <Button variant="outline" size="icon" onclick={startNewConversation} title="Reset Conversation" class="h-7.5 w-7.5 rounded-lg bg-ge-bg/60 border-ge-border/50 hover:bg-ge-accent/15 hover:border-ge-accent/40 text-ge-text-muted hover:text-ge-accent transition-all duration-200 shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          </Button>
+          <Button variant="outline" size="icon" onclick={loadRecent} title="Recent Files" class="h-7.5 w-7.5 rounded-lg bg-ge-bg/60 border-ge-border/50 hover:bg-ge-accent/15 hover:border-ge-accent/40 text-ge-text-muted hover:text-ge-accent transition-all duration-200 shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+          </Button>
+          <Button variant="outline" size="icon" onclick={openPreferences} title="Preferences" class="h-7.5 w-7.5 rounded-lg bg-ge-bg/60 border-ge-border/50 hover:bg-ge-accent/15 hover:border-ge-accent/40 text-ge-text-muted hover:text-ge-accent transition-all duration-200 shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          </Button>
+          <Button variant="outline" size="icon" onclick={() => showApiSettings = true} title="API Settings" class="h-7.5 w-7.5 rounded-lg bg-ge-bg/60 border-ge-border/50 hover:bg-ge-accent/15 hover:border-ge-accent/40 text-ge-text-muted hover:text-ge-accent transition-all duration-200 shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </Button>
+        </div>
       </div>
 
-    </div>
+      <!-- Layout, Template & Style Bank 3-Field Bar -->
+      <div class="flex items-center gap-1.5 text-xs font-roboto">
+        <!-- Layout Mode Selector -->
+        <div class="w-28 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-2 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 transition-all duration-200" title="Container Layout Mode">
+          <select bind:value={selectedLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider">
+            <option value="document" class="bg-ge-card text-ge-text">DOCUMENT</option>
+            <option value="slides" class="bg-ge-card text-ge-text">SLIDES</option>
+          </select>
+        </div>
 
-    <!-- UI Controls -->
-    <div class="flex flex-col gap-2 flex-shrink-0 text-xs">
-      <div class="flex items-center gap-2">
-        <div class="flex-1 flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer h-7" title="Page size/shape aspect ratio">
-          <select bind:value={selectedLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider text-center">
-            <option value="" disabled hidden>SHAPE</option>
-            {#each layoutShapeOptions as opt}
-              <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+        <!-- Document / Asset Template Selector -->
+        <div class="flex-1 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-2 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 transition-all duration-200" title={availableFormats.find(f => f.id === selectedFormat)?.description || "Asset Template Structure"}>
+          <select bind:value={selectedFormat} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider">
+            <option value="" disabled hidden>TEMPLATE</option>
+            {#each availableFormats as fmt}
+              <option value={fmt.id} title={fmt.description} class="bg-ge-card text-ge-text">{fmt.name}</option>
             {/each}
           </select>
         </div>
 
-        <div class="flex-1 flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer h-7" title="Content layout structure within the page">
-          <select bind:value={selectedContentLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider text-center">
-            <option value="" disabled hidden>LAYOUT</option>
-            {#each contentLayoutOptions as opt}
-              <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="flex-1 flex items-center bg-ge-bg border border-ge-border rounded px-1 py-1 focus-within:border-ge-accent relative cursor-pointer h-7" title="Visual Style Theme">
-          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider text-center">
+        <!-- Style Bank Library Selector + Edit Button -->
+        <div class="flex-1 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-1.5 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 gap-1 transition-all duration-200" title="Style Bank Theme">
+          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider">
             <option value="" disabled hidden>STYLE</option>
-            {#each styleOptions as opt}
-              <option value={opt.id} class="bg-ge-card text-ge-text">{opt.name}</option>
+            {#each availableStyles as st}
+              <option value={st.id} class="bg-ge-card text-ge-text">{st.name}</option>
+            {/each}
+          </select>
+          <button 
+            onclick={() => openStyleEditor(selectedStyle)}
+            class="text-ge-text-muted hover:text-ge-accent transition-colors p-0.5 cursor-pointer rounded hover:bg-ge-card/50"
+            title="Edit selected style pack"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+        </div>
+
+        <!-- Target Page/Slide Count -->
+        <div class="w-16 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-1 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 transition-all duration-200" title="Target Page/Slide Count">
+          <select 
+            value={pageCount ?? ""} 
+            onchange={(e) => { const v = e.currentTarget.value; pageCount = v ? parseInt(v, 10) : null; }}
+            class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider text-center"
+          >
+            <option value="" class="bg-ge-card text-ge-text">AUTO</option>
+            {#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as num}
+              <option value={num} class="bg-ge-card text-ge-text">{num} {num === 1 ? 'PG' : 'PGS'}</option>
             {/each}
           </select>
         </div>
 
+        <!-- Export Dropdown -->
         <div class="relative">
-          <button onclick={(e) => { e.stopPropagation(); showExportDropdown = !showExportDropdown; }} class="h-7 px-2 bg-ge-accent text-ge-bg rounded text-xs font-bold hover:opacity-90 transition-all flex items-center gap-1">
+          <button onclick={(e) => { e.stopPropagation(); showExportDropdown = !showExportDropdown; }} class="h-7.5 px-3 bg-gradient-to-r from-ge-accent to-orange-500 text-ge-bg rounded-lg text-xs font-bold hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-1 cursor-pointer shadow-xs">
             <span>Export</span>
             <svg class="transition-transform duration-200" class:rotate-180={showExportDropdown} xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           {#if showExportDropdown}
-            <div class="absolute right-0 mt-1 w-40 bg-ge-card border border-ge-border rounded-md shadow-xl z-30 py-1 font-sans text-xs">
-              <button class="w-full text-left px-3 py-1.5 hover:bg-ge-bg text-ge-text text-xs" onclick={() => { exportHtml(); showExportDropdown = false; }}>
+            <div class="absolute right-0 mt-1.5 w-40 bg-ge-card/95 backdrop-blur-xl border border-ge-border/70 rounded-lg shadow-xl z-30 py-1 font-roboto text-xs transition-all duration-200 ease-out animate-in fade-in zoom-in-95">
+              <button class="w-full text-left px-3 py-1.5 hover:bg-ge-accent/15 hover:text-ge-accent text-ge-text text-xs cursor-pointer transition-colors" onclick={() => { exportHtml(); showExportDropdown = false; }}>
                 HTML Document
               </button>
             </div>
@@ -907,7 +1011,7 @@
     </div>
 
     <!-- Chat + thoughts: one continuous surface (SvelteVirtualChat viewport) -->
-    <div class="flex-grow min-h-0 flex flex-col rounded-lg border border-ge-border/40 relative text-sm overflow-hidden bg-ge-bg/30">
+    <div class="flex-grow min-h-0 flex flex-col rounded-xl border border-ge-border/40 relative text-sm overflow-hidden bg-ge-bg/30 font-roboto">
       <SvelteVirtualChat
         messages={chatMessages}
         getMessageId={(msg) => msg.id}
@@ -917,12 +1021,14 @@
       >
         {#snippet renderMessage(msg)}
           {#if msg.role !== 'thinking'}
-            <div class="p-2.5 rounded-lg max-w-[85%] {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm whitespace-pre-wrap' : 'bg-ge-bg/55 text-ge-text mr-auto border border-ge-border/30'}">
+            <div class="p-3 rounded-xl max-w-[85%] font-roboto {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm whitespace-pre-wrap' : 'bg-ge-bg/60 text-ge-text mr-auto border border-ge-border/30'}">
               {#if msg.role !== 'user'}
-                <div class="text-xs font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
-                <div class="text-xs text-ge-text leading-relaxed whitespace-pre-wrap">{stripMd(msg.text)}</div>
+                <div class="text-xs font-semibold mb-1 text-ge-accent font-roboto flex items-center gap-1.5 select-none">
+                  <span>Zlides Agent</span>
+                </div>
+                <div class="text-sm text-ge-text leading-relaxed font-roboto whitespace-pre-wrap">{stripMd(msg.text)}</div>
               {:else}
-                <div class="text-ge-text text-xs">{msg.text}</div>
+                <div class="text-ge-text text-sm font-roboto">{msg.text}</div>
               {/if}
             </div>
           {/if}
@@ -930,13 +1036,13 @@
 
         {#snippet footer()}
           {#if thoughts.length > 0 || isThinking || toolCalls.length > 0}
-            <div class="p-2 rounded w-full min-w-0 overflow-hidden bg-transparent text-ge-text-muted mr-auto">
+            <div class="p-2 rounded-xl w-full min-w-0 bg-transparent text-ge-text-muted mr-auto font-roboto max-h-48 overflow-y-auto border border-ge-border/30 my-1 scrollbar-thin">
               <ChainOfThought.Root open={true} defaultOpen={true}>
                 <ChainOfThought.Header />
                 <ChainOfThought.Content>
                   {#each thoughts as thought, i}
                     <ChainOfThought.Step
-                      label={stripMd(stripImages(thought)) || "Looking at image..."}
+                      label={stripMd(stripImages(thought)) || "Analyzing design details..."}
                       status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
                     >
                       {#each extractImages(thought) as img}
@@ -955,12 +1061,12 @@
                     </ChainOfThought.SearchResults>
                   {/if}
                   {#if isThinking && thoughts.length === 0}
-                    <ChainOfThought.Step label="Initializing thought process..." status="active" />
+                    <ChainOfThought.Step label="Starting thought process..." status="active" />
                   {/if}
                   {#if isGenerating && !isThinking}
-                    <div class="flex items-center gap-2 text-ge-text-muted text-xs py-2">
+                    <div class="flex items-center gap-2 text-ge-text-muted text-xs py-2 font-roboto">
                       <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
-                      <span>Generating {apiFormat}...</span>
+                      <span>Designing {apiFormat}...</span>
                     </div>
                   {/if}
                 </ChainOfThought.Content>
@@ -971,24 +1077,24 @@
       </SvelteVirtualChat>
     </div>
 
-    <!-- Input -->
-    <div class="min-h-[400px] flex-shrink-0 flex flex-col bg-ge-bg/30 border-t border-ge-border/30 p-2.5 relative">
+    <!-- Polished Modern Glass Prompt Input Card -->
+    <div class="min-h-[220px] flex-shrink-0 flex flex-col rounded-2xl border border-ge-border/50 bg-ge-card/40 backdrop-blur-md p-3 relative focus-within:border-ge-accent/60 focus-within:ring-2 focus-within:ring-ge-accent/15 shadow-md transition-all duration-200">
         <!-- Advanced Collapsible Toggle -->
-        <Collapsible.Root bind:open={showAdvancedPromptOptions} class="mb-1 text-xs text-ge-text-muted font-bold tracking-wider font-mono">
+        <Collapsible.Root bind:open={showAdvancedPromptOptions} class="mb-1.5 text-xs text-ge-text-muted/80 font-medium font-roboto">
           <div class="flex items-center justify-between">
-            <Collapsible.Trigger class="hover:text-ge-text transition-colors flex items-center gap-1 cursor-pointer uppercase select-none">
+            <Collapsible.Trigger class="hover:text-ge-accent transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider text-[11px] select-none">
               <svg class="transition-transform duration-200" class:rotate-90={showAdvancedPromptOptions} xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m9 18 6-6-6-6"/></svg>
               <span>One-Shot System Prompt</span>
             </Collapsible.Trigger>
-            <button onclick={() => showPromptEditor = true} class="hover:text-ge-accent transition-colors p-0.5 cursor-pointer" title="Pop out full-size editor">
+            <button onclick={() => showPromptEditor = true} class="hover:text-ge-accent transition-colors p-0.5 cursor-pointer rounded hover:bg-ge-bg/50" title="Pop out full-size editor">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
             </button>
           </div>
-          <Collapsible.Content class="mb-2.5 border-b border-ge-border/20 pb-2">
+          <Collapsible.Content class="mb-2 border-b border-ge-border/20 pb-2">
             <textarea
               bind:value={requestSystemPrompt}
               placeholder="Inject custom system rules for THIS run only (e.g. 'Use 3-column layouts. Keep paragraphs extremely short.')"
-              class="w-full h-12 bg-ge-bg/60 border border-ge-border/40 rounded p-1.5 outline-none focus:border-ge-accent text-xs font-mono text-ge-text resize-none placeholder:text-ge-text-muted/40"
+              class="w-full h-14 bg-ge-bg/70 border border-ge-border/40 rounded-lg p-2 outline-none focus:border-ge-accent text-xs font-roboto text-ge-text resize-none placeholder:text-ge-text-muted/40 transition-colors"
             ></textarea>
           </Collapsible.Content>
         </Collapsible.Root>
@@ -996,14 +1102,14 @@
         <textarea
           bind:value={promptText}
           onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
-          placeholder="Describe your vibe... (e.g. 'Turn this uploaded PDF into slides.')"
-          class="w-full flex-grow bg-transparent border-none outline-none resize-y p-1 pb-10 text-ge-text placeholder:text-ge-text-muted/50 text-sm min-h-[320px]"
+          placeholder="Describe your vibe... (e.g. 'Create a presentation on quantum physics.')"
+          class="w-full flex-grow bg-transparent border-none outline-none resize-y p-1 pb-12 text-ge-text placeholder:text-ge-text-muted/40 font-roboto text-sm min-h-[140px] focus:ring-0"
         ></textarea>
 
         <!-- Floating action buttons at the bottom of the input container -->
-        <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
+        <div class="absolute bottom-2.5 left-2.5 right-2.5 flex justify-between items-center pointer-events-none">
            <div class="flex items-center gap-1.5 pointer-events-auto">
-             <label class="cursor-pointer p-1.5 rounded bg-ge-card hover:bg-ge-border text-ge-text hover:text-ge-accent border border-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7" title="Ingest Document or Style Image" class:opacity-50={isUploading}>
+             <label class="cursor-pointer p-1.5 rounded-lg bg-ge-bg/70 hover:bg-ge-border/60 text-ge-text-muted hover:text-ge-accent border border-ge-border/50 transition-all duration-200 disabled:opacity-50 flex items-center justify-center h-7.5 w-7.5 shadow-xs" title="Ingest Document or Style Image" class:opacity-50={isUploading}>
                {#if isUploading}
                  <span class="animate-spin h-3.5 w-3.5 border-2 border-ge-accent border-t-transparent rounded-full"></span>
                {:else}
@@ -1012,45 +1118,46 @@
                <input type="file" class="hidden" onchange={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.apkg,.zip,.txt,.md,.csv" disabled={isUploading} />
              </label>
 
-             <select bind:value={uploadMode} class="bg-ge-card border border-ge-border rounded px-1.5 py-0.5 text-xs text-ge-text-muted outline-none focus:border-ge-accent cursor-pointer h-7 select-none">
+             <select bind:value={uploadMode} class="bg-ge-bg/70 border border-ge-border/50 hover:border-ge-accent/40 rounded-lg px-2 py-0.5 text-xs text-ge-text-muted font-roboto outline-none focus:border-ge-accent cursor-pointer h-7.5 select-none transition-colors">
                <option value="none" class="bg-ge-card text-ge-text">No Selection</option>
                <option value="content" class="bg-ge-card text-ge-text">Remake Content</option>
                <option value="style" class="bg-ge-card text-ge-text">Harvest Style</option>
                <option value="reference" class="bg-ge-card text-ge-text">Reference</option>
              </select>
 
-             <div class="flex items-center gap-1 bg-ge-card border border-ge-border rounded px-1.5 h-7">
-               <span class="text-xs text-ge-text-muted font-bold select-none uppercase tracking-wider font-mono">Pages:</span>
+             <div class="flex items-center gap-1 bg-ge-bg/70 border border-ge-border/50 rounded-lg px-2 h-7.5">
+               <span class="text-xs text-ge-text-muted font-semibold select-none uppercase tracking-wider font-roboto">Pages:</span>
                <input type="number" value={pageCount ?? ''} min="1" max="20" placeholder="Auto"
                  oninput={(e) => { const v = e.currentTarget.value; pageCount = v === '' ? null : Math.max(1, Math.min(20, parseInt(v, 10) || 1)); }}
-                 class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-12 text-xs font-semibold text-center placeholder:text-ge-text-muted/65 p-0" title="Number of Pages — clear to return to Auto">
+                 class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-10 text-xs font-semibold text-center placeholder:text-ge-text-muted/60 p-0 font-roboto" title="Number of Pages — clear to return to Auto">
              </div>
 
-             <label class="flex items-center gap-1.5 bg-ge-card border border-ge-border rounded px-2 h-7 cursor-pointer hover:bg-ge-border/50 transition-colors">
+             <label class="flex items-center gap-1.5 bg-ge-bg/70 border border-ge-border/50 rounded-lg px-2.5 h-7.5 cursor-pointer hover:bg-ge-border/50 transition-colors">
                <input type="checkbox" bind:checked={forceBatchMode} class="w-3 h-3 accent-ge-accent bg-transparent border-ge-border cursor-pointer">
-               <span class="text-xs text-ge-text-muted font-bold select-none uppercase tracking-wider font-mono">Batch</span>
+               <span class="text-xs text-ge-text-muted font-semibold select-none uppercase tracking-wider font-roboto">Batch</span>
              </label>
            </div>
 
-            <div class="flex items-center justify-end gap-2 pointer-events-auto shrink-0 min-w-0">
-              {#if files}
-                <span class="text-xs bg-ge-card border border-ge-border px-2 py-0.5 rounded text-ge-accent truncate max-w-[120px] min-w-[30px] shrink block" title={files[0].name}>{files[0].name}</span>
-              {/if}
-              {#if isGenerating}
-                <button onclick={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1 h-7 animate-pulse">
-                  <span class="h-1.5 w-1.5 bg-ge-bg rounded-sm"></span> Stop
-                </button>
-              {:else}
-                <button
-                  onclick={generate}
-                  disabled={!promptText.trim() && !extractedMarkdown}
-                  class="bg-ge-accent text-ge-bg rounded flex items-center justify-center h-7 w-7 hover:opacity-90 transition-all disabled:opacity-50 border border-ge-border/20 shadow-sm"
-                  title="Send Command"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-              {/if}
-            </div>
+             <div class="flex items-center justify-end gap-2 pointer-events-auto shrink-0 min-w-0">
+               {#if files}
+                 <span class="text-xs bg-ge-bg/80 border border-ge-border px-2 py-0.5 rounded-lg text-ge-accent truncate max-w-[120px] min-w-[30px] shrink block font-roboto" title={files[0].name}>{files[0].name}</span>
+               {/if}
+               {#if isGenerating}
+                 <button onclick={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1 rounded-lg text-xs hover:opacity-90 transition-all flex items-center gap-1 h-7.5 animate-pulse shadow-xs font-roboto">
+                   <span class="h-1.5 w-1.5 bg-ge-bg rounded-sm"></span> Stop
+                 </button>
+               {:else}
+                 <button
+                   onclick={generate}
+                   disabled={!promptText.trim() && !extractedMarkdown}
+                   class="bg-gradient-to-r from-ge-accent to-orange-500 hover:from-orange-500 hover:to-ge-accent text-ge-bg rounded-lg flex items-center justify-center h-7.5 px-3 hover:scale-[1.03] active:scale-[0.97] transition-all disabled:opacity-40 shadow-sm border border-orange-400/30 cursor-pointer font-roboto font-bold gap-1 text-xs"
+                   title="Send Command"
+                 >
+                   <span>Send</span>
+                   <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                 </button>
+               {/if}
+             </div>
         </div>
     </div>
 
@@ -1074,50 +1181,50 @@
 
           <div class="flex flex-col gap-3 text-xs flex-grow">
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style ID</label>
-              <input type="text" bind:value={editingStyleId} disabled class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text opacity-60 font-mono text-xs" />
+              <label for="style-id-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style ID</label>
+              <input id="style-id-input" type="text" bind:value={editingStyleId} disabled class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text opacity-60 font-mono text-xs" />
             </div>
 
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style Name</label>
-              <input type="text" bind:value={editingStyleName} placeholder="e.g. GitEnglish Hub" class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text focus:border-ge-accent" />
+              <label for="style-name-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style Name</label>
+              <input id="style-name-input" type="text" bind:value={editingStyleName} placeholder="e.g. GitEnglish Hub" class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text focus:border-ge-accent" />
             </div>
 
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">AI Prompt Hint</label>
-              <textarea bind:value={editingStylePromptHint} rows="4" placeholder="Instructions for the AI slide agent on colors, layouts..." class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text resize-y focus:border-ge-accent placeholder:text-ge-text-muted/40 font-mono text-xs"></textarea>
+              <label for="style-prompt-hint" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">AI Prompt Hint</label>
+              <textarea id="style-prompt-hint" bind:value={editingStylePromptHint} rows="4" placeholder="Instructions for the AI slide agent on colors, layouts..." class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text resize-y focus:border-ge-accent placeholder:text-ge-text-muted/40 font-mono text-xs"></textarea>
             </div>
 
             <div class="grid grid-cols-2 gap-2 mt-1">
               <div class="flex flex-col gap-1">
-                <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Background</label>
+                <label for="style-bg-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Background</label>
                 <div class="flex items-center gap-1.5">
-                  <input type="color" bind:value={editingStyleBg} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                  <input type="text" bind:value={editingStyleBg} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                  <input id="style-bg-input" type="color" bind:value={editingStyleBg} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleBg} aria-label="Hex code background" class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1">
-                <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Card Background</label>
+                <label for="style-card-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Card Background</label>
                 <div class="flex items-center gap-1.5">
-                  <input type="color" bind:value={editingStyleCard} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                  <input type="text" bind:value={editingStyleCard} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                  <input id="style-card-input" type="color" bind:value={editingStyleCard} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleCard} aria-label="Hex code card background" class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1">
-                <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Text Color</label>
+                <label for="style-text-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Text Color</label>
                 <div class="flex items-center gap-1.5">
-                  <input type="color" bind:value={editingStyleText} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                  <input type="text" bind:value={editingStyleText} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                  <input id="style-text-input" type="color" bind:value={editingStyleText} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleText} aria-label="Hex code text color" class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1">
-                <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Color</label>
+                <label for="style-accent-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Color</label>
                 <div class="flex items-center gap-1.5">
-                  <input type="color" bind:value={editingStyleAccent} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                  <input type="text" bind:value={editingStyleAccent} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                  <input id="style-accent-input" type="color" bind:value={editingStyleAccent} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleAccent} aria-label="Hex code accent color" class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-xs" />
                 </div>
               </div>
             </div>
@@ -1134,42 +1241,42 @@
               {#if showAdvancedColors}
                 <div class="grid grid-cols-2 gap-2 pt-2 border-t border-ge-border/30">
                   <div class="flex flex-col gap-1">
-                    <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Secondary Text</label>
+                    <label for="style-text-sec-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Secondary Text</label>
                     <div class="flex items-center gap-1">
-                      <input type="color" bind:value={editingStyleTextSecondary} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                      <input type="text" bind:value={editingStyleTextSecondary} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                      <input id="style-text-sec-input" type="color" bind:value={editingStyleTextSecondary} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleTextSecondary} aria-label="Hex code secondary text" class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
                     </div>
                   </div>
 
                   <div class="flex flex-col gap-1">
-                    <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Border Color</label>
+                    <label for="style-border-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Border Color</label>
                     <div class="flex items-center gap-1">
-                      <input type="color" bind:value={editingStyleBorder} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                      <input type="text" bind:value={editingStyleBorder} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                      <input id="style-border-input" type="color" bind:value={editingStyleBorder} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleBorder} aria-label="Hex code border color" class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
                     </div>
                   </div>
 
                   <div class="flex flex-col gap-1">
-                    <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Hover</label>
+                    <label for="style-accent-hover-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Hover</label>
                     <div class="flex items-center gap-1">
-                      <input type="color" bind:value={editingStyleAccentHover} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                      <input type="text" bind:value={editingStyleAccentHover} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                      <input id="style-accent-hover-input" type="color" bind:value={editingStyleAccentHover} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleAccentHover} aria-label="Hex code accent hover" class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
                     </div>
                   </div>
 
                   <div class="flex flex-col gap-1">
-                    <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Success Color</label>
+                    <label for="style-success-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Success Color</label>
                     <div class="flex items-center gap-1">
-                      <input type="color" bind:value={editingStyleSuccess} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                      <input type="text" bind:value={editingStyleSuccess} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                      <input id="style-success-input" type="color" bind:value={editingStyleSuccess} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleSuccess} aria-label="Hex code success color" class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
                     </div>
                   </div>
 
                   <div class="flex flex-col gap-1 col-span-2">
-                    <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Danger Color</label>
+                    <label for="style-danger-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Danger Color</label>
                     <div class="flex items-center gap-1">
-                      <input type="color" bind:value={editingStyleDanger} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
-                      <input type="text" bind:value={editingStyleDanger} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
+                      <input id="style-danger-input" type="color" bind:value={editingStyleDanger} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleDanger} aria-label="Hex code danger color" class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-xs" />
                     </div>
                   </div>
                 </div>
@@ -1199,14 +1306,14 @@
 
           <div class="flex flex-col gap-4 text-xs flex-grow">
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Z.AI API Key</label>
-              <input type="password" bind:value={customApiKey} placeholder="Leave blank to use server default" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent" />
+              <label for="api-key-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Z.AI API Key</label>
+              <input id="api-key-input" type="password" bind:value={customApiKey} placeholder="Leave blank to use server default" class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent" />
               <p class="text-xs text-ge-text-muted mt-1">Provide your own Z.AI key to use Zlides on this machine.</p>
             </div>
 
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Base URL</label>
-              <input type="text" bind:value={customBaseUrl} class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent font-mono text-xs" />
+              <label for="base-url-input" class="text-xs font-mono uppercase tracking-wider text-ge-text-muted font-bold">Base URL</label>
+              <input id="base-url-input" type="text" bind:value={customBaseUrl} class="bg-ge-bg border border-ge-border rounded p-2 outline-none text-ge-text focus:border-ge-accent font-mono text-xs" />
             </div>
 
             <div class="flex gap-2 mt-auto pt-4 border-t border-ge-border">
@@ -1231,78 +1338,74 @@
       {/if}
 
       {#if showRecent}
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 font-sans animate-in fade-in duration-200">
-          <div class="relative w-full max-w-[90vw] h-[90vh] flex flex-col items-center justify-center">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 font-sans animate-in fade-in duration-200">
+          <div class="relative w-full max-w-[95vw] h-[90vh] flex flex-col items-center justify-center">
             
             <div class="absolute top-0 right-0 z-50 flex gap-2">
-              <button onclick={() => showRecent = false} class="px-4 py-2 bg-ge-card border border-ge-border rounded-lg text-ge-text hover:text-ge-accent transition-colors font-bold shadow-lg">Close Gallery</button>
+              <button onclick={() => showRecent = false} class="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-ge-text hover:text-ge-accent transition-all font-bold text-xs shadow-lg backdrop-blur-md cursor-pointer">Close Gallery</button>
             </div>
 
-            <div class="text-center mb-6">
-              <h2 class="text-3xl font-bold text-ge-accent font-raleway tracking-tight drop-shadow-md">Past Generations Gallery</h2>
-              <p class="text-ge-text-muted mt-1 text-sm">Scroll to review your previous generations</p>
+            <div class="text-center mb-4 select-none">
+              <h2 class="text-2xl font-bold text-ge-accent font-raleway tracking-tight drop-shadow-md">Past Generations Gallery</h2>
+              <p class="text-ge-text-muted mt-0.5 text-xs">Scroll to review your previous generations</p>
             </div>
 
             {#if recentSlides.length === 0}
-              <p class="text-ge-text-muted">No saved slides yet.</p>
+              <p class="text-ge-text-muted text-sm">No saved slides yet.</p>
             {:else}
-              <Carousel.Root class="w-full max-w-[95vw]" opts={{ align: "center" }} setApi={(api: any) => galleryCarouselApi = api} onwheel={handleGalleryWheel}>
-                <Carousel.Content class="-ms-4 py-8">
-                  {#each recentSlides.slice(0, 20) as slide}
-                    <Carousel.Item class="ps-4 basis-[70%] md:basis-[50%] lg:basis-[35%]">
+              <Carousel.Root class="w-full max-w-[95vw]" opts={{ align: "start" }} setApi={(api: any) => galleryCarouselApi = api} onwheel={handleGalleryWheel}>
+                <Carousel.Content class="-ms-3 py-4">
+                  {#each recentSlides.slice(0, 25) as slide}
+                    <Carousel.Item class="ps-3 basis-[85%] sm:basis-[45%] md:basis-[30%] lg:basis-[22%] xl:basis-[18%]">
                       <div class="p-1 h-full">
-                        <Card.Root class="bg-ge-card border-ge-border/70 shadow-2xl h-full flex flex-col">
-                          <Card.Header class="pb-2 shrink-0">
-                            <Card.Title class="text-ge-accent font-raleway truncate text-2xl">{slide.title}</Card.Title>
-                            <Card.Description class="text-xs text-ge-text-muted flex items-center gap-2">
+                        <div class="bg-white/[0.04] backdrop-blur-xl border border-white/10 hover:border-ge-accent/60 rounded-xl shadow-2xl transition-all duration-300 hover:bg-white/[0.08] hover:scale-[1.02] flex flex-col h-full overflow-hidden group/card">
+                          <div class="p-3 pb-2 shrink-0 border-b border-white/10">
+                            <h4 class="text-xs font-bold text-ge-accent font-raleway truncate tracking-tight">{slide.title}</h4>
+                            <div class="text-[10px] text-ge-text-muted font-mono flex items-center justify-between mt-1">
                               <span>{slide.date}</span> 
-                              <span>·</span> 
                               <span>{(slide.size / 1024).toFixed(0)}KB</span>
-                            </Card.Description>
-                          </Card.Header>
-                          <Card.Content class="flex-grow p-0 relative overflow-hidden bg-white/5 mx-6 mb-4 rounded border border-ge-border/30 h-[55vh]">
+                            </div>
+                          </div>
+                          <div class="flex-grow p-0 relative overflow-hidden bg-white/5 h-[34vh]">
                             <iframe
                               src="/saved/{slide.filename}"
                               title={slide.title}
                               loading="lazy"
-                              class="w-full h-full border-none"
-                              sandbox="allow-scripts allow-same-origin"
+                              class="w-full h-full border-none pointer-events-none"
                             ></iframe>
-                            <!-- Intercept clicks so they can scroll -->
                             <div class="absolute inset-0 z-10" style="background: transparent;"></div>
-                          </Card.Content>
-                          <Card.Footer class="flex justify-center gap-3 pb-6 shrink-0">
+                          </div>
+                          <div class="flex items-center justify-between gap-1.5 p-2 bg-black/20 border-t border-white/10 shrink-0">
                             <button 
                               onclick={() => { previewSlideFile = slide; showRecent = false; }}
-                              class="px-5 py-2.5 bg-ge-card border border-ge-border hover:border-ge-accent text-ge-text hover:text-ge-accent font-bold rounded-lg shadow-md transition-all hover:scale-105 flex items-center gap-2"
-                              title="Read the full document in a popup without losing your current work"
+                              class="p-1.5 bg-white/10 hover:bg-ge-accent hover:text-ge-bg text-ge-text rounded-md transition-all shadow-xs flex items-center justify-center cursor-pointer"
+                              title="Preview Fullscreen"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                              <span>Preview Fullscreen</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
                             <button 
                               onclick={() => { previewSlideFile = slide; loadPreviewedToWorkspace(); showRecent = false; }}
-                              class="px-5 py-2.5 bg-ge-success hover:bg-ge-success/90 text-ge-bg font-bold rounded-lg shadow-xl transition-all hover:scale-105 flex items-center gap-2"
-                              title="Load this into your editor"
+                              class="px-2.5 py-1 bg-ge-success/80 hover:bg-ge-success text-ge-bg font-bold rounded-md text-[11px] shadow-sm transition-all flex items-center gap-1 cursor-pointer flex-1 justify-center"
+                              title="Load into workspace"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                               <span>Load</span>
                             </button>
                             <button 
                               onclick={() => deleteRecentSlide(slide.filename)}
-                              class="px-4 py-2.5 bg-ge-card border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 hover:text-red-500 font-bold rounded-lg shadow-md transition-all hover:scale-105 flex items-center justify-center"
-                              title="Delete this saved slide permanently"
+                              class="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 rounded-md transition-all shadow-xs flex items-center justify-center cursor-pointer"
+                              title="Delete permanently"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                             </button>
-                          </Card.Footer>
-                        </Card.Root>
+                          </div>
+                        </div>
                       </div>
                     </Carousel.Item>
                   {/each}
                 </Carousel.Content>
-                <Carousel.Previous class="text-ge-accent border-ge-border hover:bg-ge-bg hover:text-ge-text scale-150 -left-12" />
-                <Carousel.Next class="text-ge-accent border-ge-border hover:bg-ge-bg hover:text-ge-text scale-150 -right-12" />
+                <Carousel.Previous class="text-ge-accent border-white/20 bg-black/40 hover:bg-ge-accent hover:text-ge-bg scale-125 -left-10" />
+                <Carousel.Next class="text-ge-accent border-white/20 bg-black/40 hover:bg-ge-accent hover:text-ge-bg scale-125 -right-10" />
               </Carousel.Root>
             {/if}
           </div>
@@ -1320,8 +1423,9 @@
         <iframe
           bind:this={iframeElement}
           title="Slide Preview"
-          srcdoc={iframeSrcDoc}
-          class="w-full h-full bg-transparent"
+          srcdoc={ensureScrollableHtml(iframeSrcDoc)}
+          onload={handleIframeLoad}
+          class="w-full h-full bg-transparent overflow-y-auto"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
 

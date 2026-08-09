@@ -12,44 +12,122 @@ The user message is composed from the user's own format prompt + optional
 official response contract, verbatim.
 """
 
-import asyncio
 import json
+import re
 import uuid
 from pathlib import Path
+import httpx
 
-from zai import ZaiClient
+from server.core.styles import load_style_bank
 
 FORMATS_DIR = Path("formats")
 RATE_USD_PER_M = 0.70
+DEFAULT_ZAI_URL = "https://api.z.ai/api/v1/agents"
 
 
-def build_prompt(fmt: str, message: str) -> str:
-    """Format instruction + verbatim template + user request, in one message."""
-    instruction = ""
-    fmt_file = FORMATS_DIR / f"{fmt}.json"
-    if fmt_file.exists():
-        instruction = json.loads(fmt_file.read_text(encoding="utf-8")).get("prompt", "")
+def combine_html_chunks(chunks: list[str]) -> str:
+    """Combine multiple HTML page chunks into a single valid HTML document.
 
-    if fmt and instruction:
-        base = f"Create a {fmt} (HTML format).\n\n{instruction}"
-    else:
-        base = instruction or "Create a standalone self-contained HTML document."
+    If there is only 1 chunk or chunks are simple fragments, join them.
+    If multiple full <!DOCTYPE html> documents are returned, extract styles/head
+    from the first document and merge body contents cleanly into one master document.
+    """
+    if not chunks:
+        return ""
+    if len(chunks) == 1:
+        return chunks[0]
 
-    template_file = FORMATS_DIR / f"{fmt}.template.html"
-    if template_file.exists():
-        base += (
-            "\n\n--- TEMPLATE (reproduce EXACTLY, replace content with provided data) ---\n"
-            + template_file.read_text(encoding="utf-8")
-        )
+    # Check if multiple chunks are full HTML documents
+    doctype_count = sum(1 for c in chunks if "<!doctype" in c.lower() or "<html" in c.lower())
+    if doctype_count <= 1:
+        return "".join(chunks)
 
-    return f"{base}\n\nUSER REQUEST:\n{message}"
+    styles = []
+    for c in chunks:
+        for m in re.finditer(r"<style\b[^>]*>([\s\S]*?)</style>", c, re.IGNORECASE):
+            styles.append(m.group(1).strip())
+
+    bodies = []
+    for c in chunks:
+        m = re.search(r"<body\b[^>]*>([\s\S]*?)</body>", c, re.IGNORECASE)
+        if m:
+            bodies.append(m.group(1).strip())
+        else:
+            clean_c = re.sub(r"<!DOCTYPE[^>]*>", "", c, flags=re.IGNORECASE)
+            clean_c = re.sub(r"</?(?:html|head|body)\b[^>]*>", "", clean_c, flags=re.IGNORECASE)
+            clean_c = re.sub(r"<style\b[^>]*>[\s\S]*?</style>", "", clean_c, flags=re.IGNORECASE)
+            if clean_c.strip():
+                bodies.append(clean_c.strip())
+
+    combined_style = "\n\n".join(set(styles))
+    combined_body = "\n\n".join(bodies)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+{combined_style}
+</style>
+</head>
+<body>
+{combined_body}
+</body>
+</html>"""
 
 
-def _next_or_none(iterator):
-    try:
-        return next(iterator)
-    except StopIteration:
-        return None
+LAYOUT_DIRECTIVES = {
+    # 1. Document Layouts (A4 Portrait, max-width: 800px)
+    "document": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.\n3. NO SLIDE TOOLS: Output a single continuous HTML document directly as text.",
+    "report": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.\n3. NO SLIDE TOOLS: Output a single continuous HTML document directly as text.",
+    "worksheet": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .section-break { break-inside: avoid; } }`.\n3. NO SLIDE TOOLS: Output a single continuous HTML document directly as text.",
+    "lac": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.\n3. NO SLIDE TOOLS: Output a single continuous HTML document directly as text.",
+    "guide": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 guide. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } }`.",
+
+    # 2. Presentation Slides (16:9 1280x720px)
+    "slides": "CRITICAL SLIDE LAYOUT DIRECTIVE:\n1. DIMENSIONS: 16:9 presentation stage (1280x720px). Use <section> blocks with page-break-after: always per slide.",
+
+    # 3. Web Page (Full-Width Responsive HTML)
+    "web": "CRITICAL WEB PAGE LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Full-width responsive website layout. `width: 100%; max-width: 1200px; margin: 0 auto;`.\n2. INTERACTION & NAV: Modern responsive web structure, clean hero, section anchors, fluid typography."
+}
+
+
+def build_prompt(fmt: str, message: str, style_id: str = "auto") -> str:
+    """Follows Chapter 4 instruction order: Format & Structure -> Content -> Style.
+    Style is a modifier and goes after Content.
+    """
+    fmt_clean = (fmt or "").lower().strip()
+    parts = []
+
+    # 1. Format & Structure (Blueprint + Layout Directive)
+    layout_dir = LAYOUT_DIRECTIVES.get(fmt_clean)
+    if layout_dir:
+        parts.append(layout_dir)
+
+    if fmt_clean and fmt_clean != "auto":
+        fmt_file = FORMATS_DIR / f"{fmt_clean}.json"
+        if fmt_file.exists():
+            try:
+                instruction = json.loads(fmt_file.read_text(encoding="utf-8")).get("prompt", "")
+                if instruction:
+                    parts.append(instruction)
+            except Exception:
+                pass
+
+    # 2. Content (User Source Data)
+    parts.append(message)
+
+    # 3. Visual Style (Modifier on top of structured content)
+    if style_id and style_id != "auto":
+        styles = load_style_bank()
+        style_pack = styles.get(style_id)
+        if style_pack:
+            hint = style_pack.get("prompt_hint", "")
+            if hint:
+                parts.append(f"STYLE DIRECTIVE:\n{hint}")
+
+    return "\n\n".join(parts)
 
 
 def _messages_from_chunk(chunk: dict) -> list[dict]:
@@ -57,96 +135,128 @@ def _messages_from_chunk(chunk: dict) -> list[dict]:
     choices = chunk.get("choices") or []
     if not choices:
         return []
-    messages = choices[0].get("message") or []
+    first_choice = choices[0]
+    messages = first_choice.get("message") or first_choice.get("messages") or []
     if isinstance(messages, dict):
         messages = [messages]
-    return messages or (choices[0].get("messages") or [])
+    return messages
 
 
 async def stream(api_key: str, fmt: str, message: str,
+                 style: str = "auto",
                  conversation_id: str | None = None,
                  base_url: str | None = None):
-    """Stream one generation. Yields (event, payload); last is
+    """Stream one generation using direct HTTP SSE. Yields (event, payload); last is
     ("final_html", {"html", "filename", "conversation_id", "cost_usd"})."""
     if not api_key:
         raise ValueError("No Z.AI API key configured.")
 
-    messages = [{"role": "user", "content": [{"type": "text", "text": build_prompt(fmt, message)}]}]
+    messages = [{"role": "user", "content": [{"type": "text", "text": build_prompt(fmt, message, style)}]}]
 
-    kwargs = {
+    payload = {
         "agent_id": "slides_glm_agent",
         "stream": True,
         "messages": messages,
         "request_id": str(uuid.uuid4()),
     }
     if conversation_id:
-        kwargs["extra_body"] = {"conversation_id": conversation_id}
+        payload["conversation_id"] = conversation_id
 
-    if base_url and base_url.rstrip("/").endswith("/v1/agents"):
-        base_url = base_url[: base_url.rfind("/v1/agents")]
-    if not base_url:
-        base_url = None
+    # Resolve target endpoint URL
+    target_url = base_url.strip() if base_url and base_url.strip() else DEFAULT_ZAI_URL
+    if not target_url.endswith("/v1/agents"):
+        target_url = target_url.rstrip("/") + "/v1/agents"
 
-    def _open():
-        client = ZaiClient(api_key=api_key, base_url=base_url)
-        return client.agents.invoke(**kwargs)
-
-    stream_iter = await asyncio.to_thread(_open)
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+    }
 
     accumulators: dict[tuple, str] = {}
     usage: dict = {}
 
-    while True:
+    import os
+    cert_path = True
+    try:
+        import certifi
+        cp = certifi.where()
+        if cp and os.path.exists(cp):
+            cert_path = cp
+    except Exception:
+        cert_path = True
+
+    try:
         try:
-            chunk_obj = await asyncio.to_thread(_next_or_none, stream_iter)
-        except Exception as ex:
-            yield ("error", {"type": "error", "text": f"Z.AI stream error: {ex}"})
-            return
-        if chunk_obj is None:
-            break
+            client = httpx.AsyncClient(timeout=180.0, verify=cert_path)
+        except (FileNotFoundError, Exception):
+            client = httpx.AsyncClient(timeout=180.0, verify=False)
 
-        try:
-            chunk = chunk_obj.to_dict() if hasattr(chunk_obj, "to_dict") else chunk_obj
-        except Exception:
-            continue
-        if not isinstance(chunk, dict):
-            continue
+        async with client:
+            async with client.stream("POST", target_url, headers=headers, json=payload) as response:
+                if response.status_code != 200:
+                    body = await response.aread()
+                    error_msg = body.decode("utf-8", errors="ignore")
+                    yield ("error", {"type": "error", "text": f"Z.AI HTTP {response.status_code}: {error_msg}"})
+                    return
 
-        if chunk.get("conversation_id"):
-            conversation_id = chunk["conversation_id"]
-        if chunk.get("usage"):
-            usage = chunk["usage"]
-        if chunk.get("error"):
-            error = chunk["error"]
-            yield ("error", {"type": "error", "text": error.get("message", "Z.AI generation failed") if isinstance(error, dict) else str(error)})
-            return
+                async for line in response.aiter_lines():
+                    line = line.strip()
+                    if not line or not line.startswith("data:"):
+                        continue
 
-        for msg in _messages_from_chunk(chunk):
-            phase = msg.get("phase")
-            content_data = msg.get("content")
-            contents = content_data if isinstance(content_data, list) else ([content_data] if isinstance(content_data, dict) else [])
-            for content in contents:
-                if content.get("type") == "text" and content.get("text"):
-                    event = "thinking" if phase == "thinking" else "answer"
-                    yield (event, {"type": event, "content": content["text"]})
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
+                        break
 
-                elif content.get("type") == "object":
-                    obj = content.get("object", {})
-                    output = obj.get("output", "")
-                    position = obj.get("position", [0])
-                    if output:
-                        if not isinstance(output, str):
-                            output = str(output)
-                        key = tuple(position)
-                        accumulators[key] = accumulators.get(key, "") + output.replace("\\n", "\n").replace('\\"', '"')
-                        yield ("page", {
-                            "type": "page",
-                            "html": accumulators[key],
-                            "position": position,
-                            "tool_name": obj.get("tool_name", ""),
-                        })
+                    try:
+                        chunk = json.loads(data_str)
+                    except Exception:
+                        continue
 
-    document = "".join(accumulators[k] for k in sorted(accumulators)) if accumulators else ""
+                    if not isinstance(chunk, dict):
+                        continue
+
+                    if chunk.get("conversation_id"):
+                        conversation_id = chunk["conversation_id"]
+                    if chunk.get("usage"):
+                        usage = chunk["usage"]
+                    if chunk.get("error"):
+                        err = chunk["error"]
+                        err_text = err.get("message", "Z.AI generation failed") if isinstance(err, dict) else str(err)
+                        yield ("error", {"type": "error", "text": err_text})
+                        return
+
+                    for msg in _messages_from_chunk(chunk):
+                        phase = msg.get("phase")
+                        content_data = msg.get("content")
+                        contents = content_data if isinstance(content_data, list) else ([content_data] if isinstance(content_data, dict) else [])
+                        for content in contents:
+                            if content.get("type") == "text" and content.get("text"):
+                                event = "thinking" if phase == "thinking" else "answer"
+                                yield (event, {"type": event, "content": content["text"]})
+
+                            elif content.get("type") == "object":
+                                obj = content.get("object", {})
+                                output = obj.get("output", "")
+                                position = obj.get("position", [0])
+                                if output:
+                                    if not isinstance(output, str):
+                                        output = str(output)
+                                    key = tuple(position)
+                                    accumulators[key] = accumulators.get(key, "") + output.replace("\\n", "\n").replace('\\"', '"')
+                                    yield ("page", {
+                                        "type": "page",
+                                        "html": accumulators[key],
+                                        "position": position,
+                                        "tool_name": obj.get("tool_name", ""),
+                                    })
+    except Exception as ex:
+        yield ("error", {"type": "error", "text": f"Z.AI stream error ({type(ex).__name__}): {ex}"})
+        return
+
+    raw_chunks = [accumulators[k] for k in sorted(accumulators)] if accumulators else []
+    document = combine_html_chunks(raw_chunks)
     if not document:
         yield ("error", {"type": "error", "text": "Agent produced no HTML output."})
         return

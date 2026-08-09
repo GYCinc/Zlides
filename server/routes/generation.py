@@ -11,7 +11,7 @@ import json
 
 from server.core.state import (
     Z_AI_API_KEY, STYLE_BANK_DIR, VERSION,
-    get_session_store, set_conversation_id, sanitize_html,
+    set_conversation_id, sanitize_html,
 )
 from server.core.prompts import load_format_metadata
 from server.core.styles import load_style_bank, embed_style_fonts
@@ -24,11 +24,6 @@ from server.stream import stream
 router = APIRouter()
 file_parser = FileParserPipeline(api_key=Z_AI_API_KEY)
 
-EDIT_KEYWORDS = {"edit", "change", "modify", "update", "fix", "adjust", "reformat", "layout", "convert"}
-
-
-def _is_edit_request(text: str) -> bool:
-    return any(k in text.lower() for k in EDIT_KEYWORDS)
 
 
 def _apply_style(html: str, style_id: str) -> str:
@@ -52,10 +47,8 @@ async def list_formats():
 
 @router.post("/command")
 async def send_command(request: ChatRequest):
-    session_data = await get_session_store()
-    conversation_id = session_data.get("conversation_id")
-    if not _is_edit_request(request.message):
-        conversation_id = None
+    # Isolated tab session: use request's conversation_id (held in tab RAM), or None for fresh requests
+    conversation_id = request.conversation_id
 
     print(f"[API] Format: {request.format} | Style: {request.style} | Message: {request.message[:50]}...", flush=True)
 
@@ -64,6 +57,7 @@ async def send_command(request: ChatRequest):
             api_key=request.api_key or Z_AI_API_KEY,
             fmt=request.format,
             message=request.message,
+            style=request.style,
             conversation_id=conversation_id,
             base_url=request.base_url,
         ):
@@ -71,11 +65,30 @@ async def send_command(request: ChatRequest):
                 html = _apply_style(payload["html"], request.style)
                 payload["html"] = html
                 payload["filename"] = save_generated_html(html, request.message)
-                if payload.get("conversation_id"):
-                    await set_conversation_id(payload["conversation_id"])
             yield f"data: {json.dumps(payload)}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+@router.post("/api/print")
+async def api_print(request: ChatRequest):
+    """One-shot printing press endpoint for zlides CLI."""
+    html = ""
+    async for event_name, payload in stream(
+        api_key=request.api_key or Z_AI_API_KEY,
+        fmt=request.format,
+        message=request.message,
+        style=request.style,
+        base_url=request.base_url,
+    ):
+        if event_name == "final_html":
+            html = _apply_style(payload["html"], request.style)
+
+    if not html:
+        raise HTTPException(status_code=500, detail="Generation yielded no HTML")
+
+    filename = save_generated_html(html, request.message)
+    return {"status": "success", "html": html, "filename": filename}
 
 
 @router.post("/batch")

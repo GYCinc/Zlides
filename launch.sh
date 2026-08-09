@@ -53,7 +53,7 @@ trap cleanup INT TERM EXIT
 
 # ── Start server ───────────────────────────────────────────────────────────
 echo "Starting server..."
-uv run python slide_server.py 2>&1 &
+uv run --python /usr/bin/python3 python slide_server.py 2>&1 &
 BACKEND_PID=$!
 
 sleep 2
