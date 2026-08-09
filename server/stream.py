@@ -78,18 +78,14 @@ def combine_html_chunks(chunks: list[str]) -> str:
 
 
 LAYOUT_DIRECTIVES = {
-    # 1. Document Layouts (A4 Portrait, max-width: 800px)
-    "document": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document layout. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.",
-    "report": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document layout. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.",
-    "worksheet": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document layout. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .section-break { break-inside: avoid; } }`.",
-    "lac": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 document layout. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto; padding: 24px;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } .card, .summary-box, .section-break { break-inside: avoid; } }`.",
-    "guide": "CRITICAL DOCUMENT LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Single continuous A4 guide layout. Container MUST have `max-width: 800px; width: 100%; margin: 0 auto;`.\n2. PRINT & PDF: `@media print { @page { size: A4 portrait; margin: 12mm; } }`.",
-
-    # 2. Presentation Slides (16:9 1280x720px)
-    "slides": "CRITICAL SLIDE LAYOUT DIRECTIVE:\n1. DIMENSIONS: 16:9 presentation stage (1280x720px). Use <section> blocks with page-break-after: always per slide.",
-
-    # 3. Web Page (Full-Width Responsive HTML)
-    "web": "CRITICAL WEB PAGE LAYOUT DIRECTIVE:\n1. PAGE DIMENSIONS: Full-width responsive website layout. `width: 100%; max-width: 1200px; margin: 0 auto;`.\n2. INTERACTION & NAV: Modern responsive web structure, clean hero, section anchors, fluid typography."
+    # Pure container geometry specs
+    "document": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
+    "report": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
+    "worksheet": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
+    "lac": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
+    "guide": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; }`",
+    "slides": "Page Container: 16:9 stage (1280x720px) with page-break-after: always per slide.",
+    "web": "Page Container: Full-width responsive web layout (`max-width: 1200px; margin: 0 auto;`)."
 }
 
 
