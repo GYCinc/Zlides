@@ -78,12 +78,12 @@ def combine_html_chunks(chunks: list[str]) -> str:
 
 
 LAYOUT_DIRECTIVES = {
-    # Container geometry specs (1000px fills screen preview gracefully)
-    "document": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "report": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "worksheet": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "lac": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "guide": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
+    # 800px A4 document paper sheet sitting on a dark canvas backdrop
+    "document": "Document Sheet: `body { background: #090a0f; } .container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "report": "Document Sheet: `body { background: #090a0f; } .container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "worksheet": "Document Sheet: `body { background: #090a0f; } .container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "lac": "Document Sheet: `body { background: #090a0f; } .container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "guide": "Document Sheet: `body { background: #090a0f; } .container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
     "slides": "Page Container: 16:9 stage (1280x720px) with page-break-after: always per slide.",
     "web": "Page Container: Full-width responsive web layout (`max-width: 1200px; margin: 0 auto;`)."
 }
