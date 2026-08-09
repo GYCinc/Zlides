@@ -22,6 +22,5 @@ async def save_preferences(request: dict):
 
 @router.post("/conversation/clear")
 async def clear_conversation():
-    """Clear conversation history to start a fresh token context session."""
-    await set_conversation_id(None)
+    """Clear conversation history to start a fresh session."""
     return {"status": "cleared"}

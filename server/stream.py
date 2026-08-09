@@ -78,13 +78,13 @@ def combine_html_chunks(chunks: list[str]) -> str:
 
 
 LAYOUT_DIRECTIVES = {
-    "document": "Document Layout: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "report": "Document Layout: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "worksheet": "Document Layout: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "lac": "Document Layout: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "guide": "Document Layout: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
-    "slides": "Slide Deck Layout: 16:9 presentation stage (1280x720px) per slide.",
-    "web": "Web Page Layout: Full-width responsive layout (`max-width: 1200px; margin: 0 auto;`)."
+    "document": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "report": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "worksheet": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "lac": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "guide": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
+    "slides": "Slide Deck Layout: Call initialize_design with required slide count. 16:9 stage (1280x720px) per slide.",
+    "web": "Web Page Layout: Call initialize_design with slide_num=1. Full-width responsive layout (`max-width: 1200px; margin: 0 auto;`)."
 }
 
 
