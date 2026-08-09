@@ -945,10 +945,11 @@
       <!-- Layout, Template & Style Bank 3-Field Bar -->
       <div class="flex items-center gap-1.5 text-xs font-roboto">
         <!-- Layout Mode Selector -->
-        <div class="w-28 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-2 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 transition-all duration-200" title="Container Layout Mode">
+        <div class="w-32 flex items-center bg-ge-bg/60 border border-ge-border/60 hover:border-ge-accent/40 rounded-lg px-2 py-1 focus-within:border-ge-accent focus-within:ring-1 focus-within:ring-ge-accent/30 relative cursor-pointer h-7.5 transition-all duration-200" title="Container Layout Mode">
           <select bind:value={selectedLayout} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 font-semibold uppercase tracking-wider">
             <option value="document" class="bg-ge-card text-ge-text">DOCUMENT</option>
             <option value="slides" class="bg-ge-card text-ge-text">SLIDES</option>
+            <option value="web" class="bg-ge-card text-ge-text">WEB PAGE</option>
           </select>
         </div>
 
@@ -1429,7 +1430,7 @@
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
 
-        {#if slides.length > 0}
+        {#if selectedLayout === 'slides' && slides.length > 1}
           <!-- Left slide navigation arrow -->
           <button
             class="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full border border-ge-border bg-ge-bg/90 text-ge-text hover:bg-ge-accent hover:border-ge-accent hover:text-ge-bg hover:scale-105 transition-all shadow-lg cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
@@ -1454,6 +1455,7 @@
           <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full border border-ge-border/80 bg-ge-bg/85 text-ge-text-muted font-mono text-xs select-none shadow-md">
             {currentSlideIndex + 1} / {slides.length}
           </div>
+        {/if}
 
           <!-- Top-right Edit & Export overlay controls -->
           <div class="absolute top-4 right-4 z-20 flex gap-2 items-center pointer-events-auto">
@@ -1464,8 +1466,7 @@
             <button class="text-xs px-3 py-1.5 bg-ge-bg/90 border border-ge-border rounded hover:bg-ge-card text-ge-text shadow-md transition-colors" onclick={toggleEditMode} title="Toggle inline editing">{isEditMode ? 'Exit Edit' : 'Edit'}</button>
             
           </div>
-        {/if}
-      </div>
+        </div>
     </div>
   </div>
 
