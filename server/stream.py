@@ -78,12 +78,12 @@ def combine_html_chunks(chunks: list[str]) -> str:
 
 
 LAYOUT_DIRECTIVES = {
-    # Pure container geometry specs
-    "document": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
-    "report": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
-    "worksheet": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
-    "lac": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; padding: 24px; }`",
-    "guide": "Page Container: `.container { max-width: 800px; width: 100%; margin: 0 auto; }`",
+    # Container geometry specs (1000px fills screen preview gracefully)
+    "document": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
+    "report": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
+    "worksheet": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
+    "lac": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
+    "guide": "Page Container: `.container { max-width: 1000px; width: 100%; margin: 0 auto; padding: 32px 40px; }`",
     "slides": "Page Container: 16:9 stage (1280x720px) with page-break-after: always per slide.",
     "web": "Page Container: Full-width responsive web layout (`max-width: 1200px; margin: 0 auto;`)."
 }
