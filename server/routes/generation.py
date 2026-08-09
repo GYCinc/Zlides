@@ -47,8 +47,8 @@ async def list_formats():
 
 @router.post("/command")
 async def send_command(request: ChatRequest):
-    # Isolated tab session: use request's conversation_id (held in tab RAM), or None for fresh requests
-    conversation_id = request.conversation_id
+    # Every generation request is 100% fresh (conversation_id=None) so Z.AI never appends old cloud history
+    conversation_id = None
 
     print(f"[API] Format: {request.format} | Style: {request.style} | Message: {request.message[:50]}...", flush=True)
 
@@ -58,7 +58,7 @@ async def send_command(request: ChatRequest):
             fmt=request.format,
             message=request.message,
             style=request.style,
-            conversation_id=conversation_id,
+            conversation_id=None,
             base_url=request.base_url,
         ):
             if event_name == "final_html":
