@@ -545,11 +545,7 @@
   function ensureScrollableHtml(html: string): string {
     if (!html) return '';
     if (!html.includes('id="zlides-scroll-fix"')) {
-      const isDocument = selectedLayout !== 'slides';
-      const previewFitStyle = isDocument
-        ? `<style id="zlides-preview-fit">@media screen { body { padding: 24px 32px !important; } .container { max-width: 100% !important; width: 100% !important; margin: 0 auto !important; } }</style>`
-        : '';
-      const scrollFix = `<style id="zlides-scroll-fix">html, body { overflow-y: auto !important; height: auto !important; min-height: 100vh; }</style>${previewFitStyle}`;
+      const scrollFix = `<style id="zlides-scroll-fix">html, body { overflow-y: auto !important; height: auto !important; min-height: 100vh; }</style>`;
       if (html.includes('</head>')) {
         return html.replace('</head>', `${scrollFix}</head>`);
       } else if (html.includes('<style>')) {
@@ -1430,7 +1426,7 @@
           title="Slide Preview"
           srcdoc={ensureScrollableHtml(iframeSrcDoc)}
           onload={handleIframeLoad}
-          class="w-full h-full bg-transparent border-0 overflow-hidden"
+          class="w-full h-full bg-transparent border-0 overflow-y-auto"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
 

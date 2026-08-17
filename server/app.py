@@ -27,8 +27,8 @@ app.include_router(export_router)
 app.include_router(conversation_router)
 
 # Mount the static Svelte compiled frontend
-app.mount("/assets", StaticFiles(directory="public/assets"), name="assets")
+app.mount("/assets", StaticFiles(directory="dist/assets"), name="assets")
 
 @app.get("/")
 async def root():
-    return FileResponse("public/index.html")
+    return FileResponse("dist/index.html")

@@ -283,12 +283,12 @@ Use it for persistent instructions:
 
 ## Building the Frontend
 
-The frontend is a Svelte 5 app in `frontend_svelte/`. Compiled output lives in `public/`. You only need to rebuild if you change frontend code:
+The frontend is a Svelte 5 app in `frontend_svelte/`. Compiled output lives in `dist/`. You only need to rebuild if you change frontend code:
 
 ```bash
 cd frontend_svelte
 bun install        # first time only
-bun run build      # outputs to ../public/
+bun run build      # outputs to ../dist/
 ```
 
 For live dev mode with hot reload:
@@ -318,7 +318,7 @@ zlides/
 ├── launch.sh             # Server launcher (sources .env, manages port)
 ├── zlides                # CLI tool (stdlib only, no deps)
 ├── frontend_svelte/      # Svelte 5 + Tailwind 4 frontend source
-├── public/               # Compiled frontend (served by FastAPI)
+├── dist/                 # Compiled frontend (served by FastAPI)
 ├── style_bank/           # Style packs (JSON)
 ├── saved_slides/         # Generated HTML output (gitignored)
 ├── tests/                # Test suite

@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@600;700;800&family=Roboto:wght@400;500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <title>Lesson Asset Template — Unified Executive Edition V5</title>
+    <style>
+        /* V5 — based on tbmLAC's visual system.
+           Structure in px/fr/% only; fonts NEVER drive layout.
+           Floor: no text under 18px. Fluid: no max-width caps.
+           Print/PDF concerns live ONLY in the print block. */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f1112;
+            color: #e5e7eb;
+            font-size: 22px;
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 100%;
+            margin: 0;
+            padding: 40px 24px;
+        }
+
+        /* HEADER */
+        header {
+            padding-bottom: 20px;
+            margin-bottom: 32px;
+            border-bottom: 1px solid rgba(255, 107, 53, 0.3);
+        }
+
+        .header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title-wrap {
+            display: flex;
+            align-items: center;
+        }
+
+        .header-icon,
+        .section-icon {
+            color: #ff6b35;
+            width: 28px;
+            height: 28px;
+            margin-right: 12px;
+            stroke-width: 1.5px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .section-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        h1 {
+            font-family: 'Raleway', sans-serif;
+            font-weight: 800;
+            font-size: 36px;
+            color: #ff6b35;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+        }
+
+        .date {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            font-size: 22px;
+            color: #9ca3af;
+        }
+
+        /* SECTIONS */
+        section {
+            margin-bottom: 40px;
+        }
+
+        .section-break {
+            page-break-inside: avoid;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid rgba(255, 107, 53, 0.2);
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+        }
+
+        h2 {
+            font-family: 'Raleway', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            color: #ff6b35;
+            text-transform: uppercase;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+        }
+
+        .count-label {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            color: #9ca3af;
+        }
+
+        /* SUMMARY BOX */
+        .summary-box {
+            background-color: #16181a;
+            border: 1px solid rgba(51, 55, 58, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .summary-box p {
+            font-size: 22px;
+            color: #d1d5db;
+            line-height: 1.6;
+        }
+
+        .summary-label {
+            position: absolute;
+            top: -14px;
+            left: 20px;
+            background-color: #0f1112;
+            padding: 2px 12px;
+            font-family: 'Raleway', sans-serif;
+            font-size: 18px;
+            color: #ff6b35;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            font-weight: 700;
+            border-radius: 4px;
+        }
+
+        /* GRIDS — fluid: 1 col phone, 2 col tablet, 3 col desktop (vocab never 4) */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .grid-1 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .row-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px 40px;
+        }
+
+        @media (min-width: 640px) {
+            .grid-3 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 768px) {
+            .row-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* CARDS */
+        .card {
+            border: 1px solid #3f3f46;
+            background-color: rgba(39, 39, 42, 0.3);
+            padding: 18px 20px;
+            border-left: 3px solid #ff6b35;
+            border-radius: 6px;
+        }
+
+        h3 {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 23px;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        h3.sm {
+            font-size: 20px;
+        }
+
+        .vocab-meta {
+            display: block;
+            font-family: 'Roboto', sans-serif;
+            font-size: 18px;
+            color: #ff6b35;
+            text-transform: capitalize;
+            letter-spacing: 0.01em;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .card p {
+            font-size: 20px;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        .card-text-only {
+            font-size: 20px;
+            color: #e5e7eb;
+            line-height: 1.5;
+        }
+
+        /* EXAMPLE LINE — separated from definition by a divider, always */
+        .ex {
+            font-size: 18px;
+            color: #9ca3af;
+            font-style: italic;
+            border-top: 1px solid rgba(63, 63, 70, 0.6);
+            padding-top: 8px;
+            margin-top: 8px;
+            line-height: 1.55;
+        }
+
+        /* LABELED ROWS — tag column sizes to content, never fixed */
+        .kv {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 12px;
+            padding: 8px 0;
+            border-top: 1px solid rgba(63, 63, 70, 0.5);
+            align-items: start;
+            margin-top: 8px;
+        }
+
+        .kv-tag {
+            font-family: 'Raleway', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ff6b35;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            padding: 1px 0;
+        }
+
+        .kv.trap .kv-tag { color: #fbbf24; }
+        .kv.model .kv-tag { color: #38bdf8; }
+        .kv.drill .kv-tag { color: #4ade80; }
+
+        .kv span:last-child {
+            font-size: 20px;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        .kv.trap span:last-child { color: #e5e7eb; }
+
+        /* BULLET LISTS */
+        .card ul.bullets {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 8px;
+        }
+
+        .card ul.bullets li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 10px;
+            font-size: 20px;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        .card ul.bullets li:last-child {
+            margin-bottom: 0;
+        }
+
+        .card ul.bullets li::before {
+            content: "•";
+            color: #ff6b35;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        .sub-header {
+            color: #ff6b35;
+            font-family: 'Raleway', sans-serif;
+            font-size: 20px;
+            margin-bottom: 16px;
+            margin-top: 0;
+            font-weight: 700;
+        }
+
+        /* FOOTER */
+        footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #3f3f46;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .footer-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        /* PHONE — stack, tighten, nothing overflows */
+        @media (max-width: 767px) {
+            .container { padding: 24px 16px; }
+            .header-flex { flex-direction: column; align-items: flex-start; gap: 8px; }
+            h1 { font-size: 28px; }
+            .summary-box { padding: 20px 16px; }
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            html, body {
+                background: #ffffff !important;
+                color: #0f172a !important;
+            }
+
+            h1, h2 { color: #ea580c !important; }
+            .header-icon, .section-icon { color: #ea580c !important; }
+            .date { color: #0f172a !important; }
+            .summary-box { background-color: #f8fafc !important; border-color: #cbd5e1 !important; }
+            .summary-label { background-color: #f8fafc !important; color: #ea580c !important; }
+            .summary-box p { color: #334155 !important; }
+            .card { background-color: #ffffff !important; border-color: #cbd5e1 !important; border-left-color: #ea580c !important; }
+            h3, h3.sm { color: #0f172a !important; }
+            .card p, .card-text-only, .card ul.bullets li, .kv span:last-child { color: #334155 !important; }
+            .ex { color: #4b5563 !important; border-top-color: #cbd5e1 !important; }
+            .count-label, .footer-text { color: #64748b !important; }
+            .vocab-meta, .kv-tag, .sub-header { color: #ea580c !important; }
+            .kv.trap .kv-tag { color: #b45309 !important; }
+            .kv.model .kv-tag { color: #0369a1 !important; }
+            .kv.drill .kv-tag { color: #15803d !important; }
+            .card ul.bullets li::before { color: #ea580c !important; }
+            .kv { border-top-color: #e2e8f0 !important; }
+            footer { border-top-color: #cbd5e1 !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-flex">
+                <div class="header-title-wrap">
+                    <svg class="header-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <h1>Lesson Notes — {{DATE_FORMATTED}} — {{STUDENT_NAME}}</h1>
+                </div>
+                <span class="date">{{DATE_FORMATTED}}</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- SUMMARY -->
+            <section id="summary">
+                <div class="summary-box">
+                    <div class="summary-label">Summary</div>
+                    <p>{{SUMMARY_TEXT}}</p>
+                </div>
+            </section>
+
+            <!-- VOCABULARY -->
+            <section class="section-break" id="vocabulary">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" viewBox="0 0 24 24">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        Vocabulary
+                    </h2>
+                    <span class="count-label">Total items: {{VOCAB_COUNT}}</span>
+                </div>
+                <div class="grid-3">
+                    <!-- LOOP FOR VOCABULARY -->
+                    <div class="card">
+                        <h3 class="sm">{{VOCAB_ITEM}}</h3>
+                        <span class="vocab-meta">{{PART_OF_SPEECH}} · Frequency: {{RANK}}</span>
+                        <p>{{VOCAB_DETAILS}}</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PHRASAL VERBS & COLLOCATIONS -->
+            <div class="row-2">
+                <section class="section-break" id="phrasal-verbs">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <line x1="6" y1="3" x2="6" y2="15"></line>
+                                <circle cx="18" cy="6" r="3"></circle>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <path d="M18 9a9 9 0 0 1-9 9"></path>
+                            </svg>
+                            Phrasal Verbs
+                        </h2>
+                        <span class="count-label">Total items: {{PV_COUNT}}</span>
+                    </div>
+                    <div class="grid-2">
+                        <!-- LOOP FOR PHRASAL VERBS -->
+                        <div class="card">
+                            <h3 class="sm">{{PV_ITEM}}</h3>
+                            <span class="vocab-meta">Latinate: {{PV_LATINATE}} · Usage: {{PV_USAGE_PERCENT}}</span>
+                            <p>{{PV_DETAILS}}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section-break" id="collocations">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Collocations
+                        </h2>
+                        <span class="count-label">Total items: {{COLLOC_COUNT}}</span>
+                    </div>
+                    <div class="grid-2">
+                        <!-- LOOP FOR COLLOCATIONS -->
+                        <div class="card">
+                            <h3 class="sm">{{COLLOC_ITEM}}</h3>
+                            <p>{{COLLOC_DETAILS}}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- GRAMMAR & IDIOMS AND PHRASES -->
+            <div class="row-2">
+                <section class="section-break" id="grammar">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                            </svg>
+                            Grammar
+                        </h2>
+                        <span class="count-label">Total items: {{GRAMMAR_COUNT}}</span>
+                    </div>
+                    <div class="grid-1">
+                        <!-- LOOP FOR GRAMMAR -->
+                        <div class="card">
+                            <h3 class="sm">{{GRAMMAR_ITEM}}</h3>
+                            <p>{{GRAMMAR_DETAILS}}</p>
+                            <div class="kv model"><span class="kv-tag">ALT</span><span>{{GRAMMAR_ALT}}</span></div>
+                            <div class="kv"><span class="kv-tag">EX</span><span>{{GRAMMAR_EX_1}}</span></div>
+                            <div class="kv"><span class="kv-tag">EX</span><span>{{GRAMMAR_EX_2}}</span></div>
+                            <div class="kv trap"><span class="kv-tag">TRAP</span><span>{{GRAMMAR_TRAP}}</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section-break" id="idioms-and-phrases">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <polyline points="4 17 10 11 4 5"></polyline>
+                                <line x1="12" y1="19" x2="20" y2="19"></line>
+                            </svg>
+                            Idioms and Phrases
+                        </h2>
+                        <span class="count-label">Total items: {{IDIOMS_COUNT}}</span>
+                    </div>
+                    <div class="grid-1">
+                        <!-- LOOP FOR IDIOMS AND PHRASES -->
+                        <div class="card">
+                            <h3 class="sm">{{IDIOM_ITEM}}</h3>
+                            <span class="vocab-meta">Register: {{IDIOM_REGISTER}}</span>
+                            <p>{{IDIOM_DETAILS}}</p>
+                            <div class="kv model"><span class="kv-tag">MEANING</span><span>{{IDIOM_IMPLICIT_MEANING}}</span></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- FOCUS POINTS (FULL WIDTH) -->
+            <section class="section-break" id="focus-points">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" viewBox="0 0 24 24">
+                            <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 3.5 3 6 7 7 4-1 7-3.5 7-7a7 7 0 0 0-7-7z"></path>
+                        </svg>
+                        Focus Points
+                    </h2>
+                    <span class="count-label">Total items: {{FOCUS_COUNT}}</span>
+                </div>
+                <div class="grid-1">
+                    <!-- LOOP FOR FOCUS POINTS -->
+                    <div class="card">
+                        <h3 class="sm">{{FOCUS_ITEM}}</h3>
+                        <ul class="bullets">
+                            <li>{{FOCUS_BULLET_1}}</li>
+                            <li>{{FOCUS_BULLET_2}}</li>
+                            <li>{{FOCUS_BULLET_3}}</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- IN-CLASS PRACTICE & SELF-STUDY -->
+            <div class="row-2">
+                <section class="section-break" id="in-class-practice">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            In-Class Practice
+                        </h2>
+                        <span class="count-label">Total items: {{PRACTICE_COUNT}}</span>
+                    </div>
+                    <div class="grid-1">
+                        <!-- LOOP FOR IN-CLASS PRACTICE -->
+                        <div class="card">
+                            <p class="card-text-only">{{PRACTICE_ITEM}}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section-break" id="self-study">
+                    <div class="section-header">
+                        <h2>
+                            <svg class="section-icon" viewBox="0 0 24 24">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                            </svg>
+                            Self-Study
+                        </h2>
+                        <span class="count-label">Total items: {{STUDY_COUNT}}</span>
+                    </div>
+                    <div class="grid-1">
+                        <!-- LOOP FOR SELF-STUDY -->
+                        <div class="card">
+                            <p class="card-text-only">{{STUDY_ITEM}}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ACTION ITEMS -->
+            <section class="section-break" id="action-items">
+                <div class="section-header">
+                    <h2>
+                        <svg class="section-icon" viewBox="0 0 24 24">
+                            <polyline points="9 11 12 14 22 4"></polyline>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        Action Items
+                    </h2>
+                    <span class="count-label">Total items: {{ACTION_COUNT}}</span>
+                </div>
+                <div class="row-2">
+                    <div>
+                        <div class="sub-header">{{STUDENT_NAME}}'s Action Items</div>
+                        <div class="grid-1">
+                            <!-- LOOP FOR STUDENT ACTION ITEMS -->
+                            <div class="card">
+                                <p class="card-text-only">{{STUDENT_ACTION_ITEM}}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="sub-header">Aaron's Action Items</div>
+                        <div class="grid-1">
+                            <!-- LOOP FOR TEACHER ACTION ITEMS -->
+                            <div class="card">
+                                <p class="card-text-only">{{TEACHER_ACTION_ITEM}}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <div class="no-print">
+            <footer>
+                <p class="footer-text">{{FOOTER_TEXT_LEFT}}</p>
+                <p class="footer-text">{{FOOTER_TEXT_RIGHT}}</p>
+            </footer>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -18,9 +18,8 @@ import uuid
 from pathlib import Path
 import httpx
 
-from server.core.styles import load_style_bank
-
-FORMATS_DIR = Path("formats")
+with open("layouts.json", "r", encoding="utf-8") as lf:
+    layout_matrix = json.load(lf)
 RATE_USD_PER_M = 0.70
 DEFAULT_ZAI_URL = "https://api.z.ai/api/v1/agents"
 
@@ -66,7 +65,7 @@ def combine_html_chunks(chunks: list[str]) -> str:
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.75"/>
 <style>
 {combined_style}
 </style>
@@ -78,37 +77,62 @@ def combine_html_chunks(chunks: list[str]) -> str:
 
 
 LAYOUT_DIRECTIVES = {
-    "document": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
-    "report": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
-    "worksheet": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
-    "lac": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
-    "guide": "Document Layout: Call initialize_design with slide_num=1. Page Container: `.container { max-width: 800px; width: 100%; margin: 32px auto; padding: 40px 48px; background: #0f1112; border: 1px solid #27272a; border-radius: 8px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }`",
-    "slides": "Slide Deck Layout: Call initialize_design with required slide count. 16:9 stage (1280x720px) per slide.",
-    "web": "Web Page Layout: Call initialize_design with slide_num=1. Full-width responsive layout (`max-width: 1200px; margin: 0 auto;`)."
-}
+        "document": """// SYSTEM GLOBAL CONFIGURATION
+    GLOBAL_MARGIN = 0.0
+    GLOBAL_BLEED  = true
 
+    // FORMAT 1: LETTER DOCUMENT
+    DOCUMENT_LAYOUT = [
+        width: 215.9mm,
+        height: 279.4mm,
+        margin_top: GLOBAL_MARGIN,
+        margin_bottom: GLOBAL_MARGIN,
+        margin_left: GLOBAL_MARGIN,
+        margin_right: GLOBAL_MARGIN,
+        bleed: GLOBAL_BLEED
+    ]""",
+        "slides": """// SYSTEM GLOBAL CONFIGURATION
+    GLOBAL_MARGIN = 0.0
+    GLOBAL_BLEED  = true
 
-def build_prompt(fmt: str, message: str, style_id: str = "auto") -> str:
-    """Follows Chapter 4 instruction order: Format & Structure -> Content -> Style.
-    Style is a modifier and goes after Content.
-    """
-    fmt_clean = (fmt or "").lower().strip()
-    parts = []
+    // FORMAT 2: WIDESCREEN SLIDE
+    SLIDE_LAYOUT = [
+        width: 1920px,
+        height: 1080px,
+        margin_top: GLOBAL_MARGIN,
+        margin_bottom: GLOBAL_MARGIN,
+        margin_left: GLOBAL_MARGIN,
+        margin_right: GLOBAL_MARGIN,
+        bleed: GLOBAL_BLEED
+    ]""",
+        "web": """// SYSTEM GLOBAL CONFIGURATION
+    GLOBAL_MARGIN = 0.0
+    GLOBAL_BLEED  = true
 
-    # 1. Format & Structure (Blueprint + Layout Directive)
-    layout_dir = LAYOUT_DIRECTIVES.get(fmt_clean)
-    if layout_dir:
-        parts.append(layout_dir)
+    // FORMAT 3: DESKTOP WEB PAGE
+    WEB_PAGE_LAYOUT = [
+        width: 1440px,
+        height: dynamic,
+        margin_top: GLOBAL_MARGIN,
+        margin_bottom: GLOBAL_MARGIN,
+        margin_left: GLOBAL_MARGIN,
+        margin_right: GLOBAL_MARGIN,
+        bleed: GLOBAL_BLEED
+    ]"""
+    }
+
 
     if fmt_clean and fmt_clean != "auto":
         fmt_file = FORMATS_DIR / f"{fmt_clean}.json"
         if fmt_file.exists():
             try:
-                instruction = json.loads(fmt_file.read_text(encoding="utf-8")).get("prompt", "")
+                # Read the file text directly without parsing a specific key
+                instruction = fmt_file.read_text(encoding="utf-8")
                 if instruction:
                     parts.append(instruction)
             except Exception:
                 pass
+
 
     # 2. Content (User Source Data)
     parts.append(message)
