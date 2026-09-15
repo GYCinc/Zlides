@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.25">
+    <title>GitEnglish Style Reference</title>
+    <style>
+        :root {
+            /* Core Palette */
+            --bg:                #0f1112;
+            --surface:           #16181a;
+            --surface-elevated:  #1e2124;
+            --line:              #2e3236;
+            --line-strong:       #373b40;
+            --line-soft:         rgba(63, 63, 70, 0.50);
+
+            /* Typography */
+            --text-heading:      #ffffff;
+            --text:              #e5e7eb;
+            --text-body:         #cfd3d8;
+            --muted:             #9ca3af;
+            --faint:             #6b7280;
+
+            /* Brand & Semantic Statuses */
+            --brand:             #ff6b35;
+            --brand-deep:        #7e1500;
+            --brand-soft:        rgba(255, 107, 53, 0.12);
+            --brand-glow:        rgba(255, 107, 53, 0.25);
+            --amber:             #f0b23e;
+            --amber-soft:        rgba(240, 178, 62, 0.12);
+            --teal:              #4fb3a9;
+            --teal-soft:         rgba(79, 179, 169, 0.12);
+            --ok:                #10b981;
+            --err:               #f43f5e;
+
+            /* Active Accent Fallback */
+            --accent:            var(--brand);
+
+            /* Typography Families */
+            --font-display:      'Fraunces', Georgia, serif;
+            --font-head:         'Raleway', sans-serif;
+            --font-body:         'Inter', system-ui, sans-serif;
+            --font-mono:         'JetBrains Mono', ui-monospace, monospace;
+            --font-ui:           system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+            /* Radii */
+            --radius-sm:         4px;
+            --radius-md:         8px;
+        }
+
+        /* Section Accent Scoping */
+        #vocabulary          { --accent: #447F9F; }
+        #phrasal-verbs       { --accent: #3B8484; }
+        #collocations        { --accent: #DE6E55; }
+        #grammar             { --accent: #B06D29; }
+        #idioms-and-phrases  { --accent: #62193D; }
+        #focus-points        { --accent: #DCE62C; }
+        #in-class-practice   { --accent: #B98CF0; }
+        #self-study          { --accent: #6FC3DF; }
+        #tutor-todos         { --accent: #9CA3AF; }
+
+        /* Base Page Styles */
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg);
+            color: var(--text);
+            font-size: 15.5px;
+            line-height: 1.6;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        /* Heading Hierarchy */
+        h1 {
+            font-family: var(--font-display);
+            font-weight: 560;
+            font-size: clamp(32px, 4.2vw, 48px);
+            line-height: 1.06;
+            letter-spacing: -0.015em;
+            color: var(--text-heading);
+            margin: 0 0 1rem;
+        }
+
+        h2 {
+            font-family: var(--font-head);
+            font-weight: 800;
+            font-size: 21px;
+            letter-spacing: 0.01em;
+            line-height: 1.2;
+            color: var(--text-heading);
+            margin: 0 0 0.75rem;
+        }
+
+        h3 {
+            font-family: var(--font-head);
+            font-weight: 700;
+            font-size: 19px;
+            line-height: 1.25;
+            letter-spacing: 0.005em;
+            color: var(--text-heading);
+            margin: 0 0 0.5rem;
+        }
+
+        /* Cards & Container Rules */
+        .card {
+            position: relative;
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
+            padding: 16px 18px 16px 21px;
+            color: var(--text-body);
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 42%, #000));
+        }
+
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 16px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--line-soft);
+        }
+
+        /* Body & Meta Typography */
+        p, .def, .card-text-only {
+            font-size: 14px;
+            color: var(--text-body);
+            line-height: 1.62;
+            letter-spacing: 0.002em;
+        }
+
+        .card-text-only {
+            color: var(--text);
+        }
+
+        .ex {
+            font-size: 13.5px;
+            color: var(--muted);
+            font-style: italic;
+            line-height: 1.5;
+            letter-spacing: 0.004em;
+        }
+
+        .sub-header {
+            color: var(--text);
+            font-family: var(--font-head);
+            font-size: 15px;
+            letter-spacing: 0.03em;
+            font-weight: 700;
+        }
+
+        /* Badges, Chips & Meta Labels */
+        .eyebrow, .summary-label, .count-label, .date-chip, .kv-tag, .pos-tag, .chip, .rank-badge, .chip-outline {
+            font-family: var(--font-ui);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .eyebrow {
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--brand);
+        }
+
+        .summary-label {
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.03em;
+            color: var(--brand);
+        }
+
+        .count-label, .date-chip {
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.02em;
+            color: var(--muted);
+        }
+
+        /* Labeled Key-Value Rows */
+        .kv {
+            display: grid;
+            grid-template-columns: 132px 1fr;
+            gap: 14px;
+            padding: 10px 0;
+            border-top: 1px solid var(--line-soft);
+        }
+
+        .kv-tag {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            line-height: 1.5;
+            color: var(--brand);
+        }
+
+        .kv.alt .kv-tag { color: var(--teal); }
+        .kv.mistake .kv-tag, .kv.trap .kv-tag { color: var(--amber); }
+
+        .pos-tag, .chip {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--accent);
+            background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+        }
+
+        .rank-badge, .chip-outline {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            color: var(--muted);
+            padding: 2px 8px;
+            border: 1px solid var(--line-strong);
+            border-radius: var(--radius-sm);
+        }
+
+        /* Section Layout */
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        section {
+            background-color: var(--surface);
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--line);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <span class="eyebrow">Lesson Asset Catalog</span>
+            <h1>Lesson Asset Catalog</h1>
+            <span class="date-chip">Aug 28, 2026</span>
+        </header>
+
+        <section id="vocabulary">
+            <h2>Vocabulary</h2>
+            <article class="card">
+                <header class="card-head">
+                    <span class="pos-tag">Noun</span>
+                    <span class="rank-badge">Core</span>
+                    <h3>Target Item</h3>
+                </header>
+                <p class="def">Clear, contextual definition of the target language point.</p>
+                <p class="ex">"Example sentence illustrating authentic communicative use in context."</p>
+            </article>
+        </section>
+    </main>
+</body>
+</html>

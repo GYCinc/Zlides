@@ -1,0 +1,229 @@
+{
+  "system": "gitEnglish Design System",
+  "version": "2.3",
+  "fallback_defaults": {
+    "--accent": "var(--brand)",
+    "--accent-deep": "var(--brand-deep)",
+    "--accent-soft": "var(--brand-soft)",
+    "--accent-glow": "var(--brand-glow)",
+    "description": "Any section, module, card, chip, or UI surface lacking explicit domain or section tagging inherits brand orange (#ff6b35) as its accent pointer."
+  },
+  "color_palette_manifest": {
+    "core_canvas": {
+      "bg": {
+        "hex": "#0f1112",
+        "var": "--bg",
+        "role": "Root page canvas and base underlay."
+      },
+      "surface": {
+        "hex": "#16181a",
+        "var": "--surface",
+        "role": "Standard container, card fill, and default panel elevation."
+      },
+      "surface_elevated": {
+        "hex": "#1e2124",
+        "var": "--surface-elevated",
+        "role": "Hover card fills, popovers, dropdowns, and nested inputs."
+      },
+      "line": {
+        "hex": "#2e3236",
+        "var": "--line",
+        "role": "Standard perimeter borders, structural dividers, and card outlines."
+      },
+      "line_strong": {
+        "hex": "#373b40",
+        "var": "--line-strong",
+        "role": "Interactive element borders, table header divides, and focused outlines."
+      },
+      "line_soft": {
+        "hex": "rgba(63, 63, 70, 0.50)",
+        "var": "--line-soft",
+        "role": "Internal card hairlines and meta chip separators."
+      }
+    },
+    "typography": {
+      "heading": {
+        "hex": "#ffffff",
+        "var": "--text-heading",
+        "role": "High-contrast h1, h2, and h3 titles."
+      },
+      "text": {
+        "hex": "#e5e7eb",
+        "var": "--text",
+        "role": "High-emphasis narrative body text, focused card content, and summaries."
+      },
+      "text_body": {
+        "hex": "#cfd3d8",
+        "var": "--text-body",
+        "role": "Standard definition body text, data cells, and secondary descriptions."
+      },
+      "muted": {
+        "hex": "#9ca3af",
+        "var": "--muted",
+        "role": "Example sentences, rank outlines, date pills, and secondary keys."
+      },
+      "faint": {
+        "hex": "#6b7280",
+        "var": "--faint",
+        "role": "Footer colophons, disabled states, and subtle meta counters."
+      }
+    },
+    "brand_core": {
+      "brand_mandarin": {
+        "hex": "#ff6b35",
+        "var": "--brand",
+        "role": "Primary brand anchor, student todo markers, and fallback accent."
+      },
+      "brand_deep": {
+        "hex": "#7e1500",
+        "var": "--brand-deep",
+        "role": "Dark gradient bottom stop and shadow tinting."
+      },
+      "brand_soft": {
+        "hex": "rgba(255, 107, 53, 0.12)",
+        "var": "--brand-soft",
+        "role": "Tinted badge fills and soft highlighted surfaces."
+      },
+      "brand_glow": {
+        "hex": "rgba(255, 107, 53, 0.25)",
+        "var": "--brand-glow",
+        "role": "Radial backdrop canvas atmospheric glow."
+      }
+    },
+    "section_domain_hues": {
+      "vocabulary": {
+        "hex": "#447F9F",
+        "name": "Slate Blue"
+      },
+      "phrasal_verbs": {
+        "hex": "#3B8484",
+        "name": "Deep Sea Mineral"
+      },
+      "collocations": {
+        "hex": "#DE6E55",
+        "name": "Terracotta / Red Jasper"
+      },
+      "grammar": {
+        "hex": "#B06D29",
+        "name": "Petrified Ochre"
+      },
+      "idioms_and_phrases": {
+        "hex": "#62193D",
+        "name": "Plum Agate"
+      },
+      "focus_points": {
+        "hex": "#DCE62C",
+        "name": "Lichen / Sulfur"
+      },
+      "in_class_practice": {
+        "hex": "#B98CF0",
+        "name": "Soft Violet"
+      },
+      "self_study": {
+        "hex": "#6FC3DF",
+        "name": "Cyan"
+      },
+      "tutor_todos": {
+        "hex": "#9CA3AF",
+        "name": "Slate Neutral"
+      }
+    }
+  },
+  "element_rules": {
+    "cards": {
+      "base": {
+        "classes": [".card"],
+        "position": "relative",
+        "overflow": "hidden",
+        "background": "var(--surface)",
+        "border": "1px solid var(--line)",
+        "border_radius": "var(--radius-sm)",
+        "padding": "16px 18px 16px 21px",
+        "color": "var(--text-body)"
+      },
+      "large": {
+        "classes": [".card-lg"],
+        "padding": "20px 24px 20px 27px"
+      },
+      "indicator_rail": {
+        "classes": [".card::before", ".card-rail::before"],
+        "content": "\"\"",
+        "position": "absolute",
+        "left": "0",
+        "top": "0",
+        "bottom": "0",
+        "width": "3px",
+        "background": "linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 42%, #000))"
+      },
+      "header_band": {
+        "classes": [".card-head"],
+        "display": "flex",
+        "justify_content": "space-between",
+        "align_items": "baseline",
+        "gap": "16px",
+        "margin_bottom": "12px",
+        "padding_bottom": "10px",
+        "border_bottom": "1px solid var(--line-soft)"
+      }
+    },
+    "chips_and_tags": {
+      "base": {
+        "font_family": "var(--font-mono)",
+        "font_size": "13px",
+        "font_weight": "600",
+        "line_height": "1.2",
+        "letter_spacing": "0.03em",
+        "padding": "1px 8px",
+        "border_radius": "var(--radius-sm)",
+        "display": "inline-flex",
+        "align_items": "center",
+        "white_space": "nowrap"
+      },
+      "filled_variants": {
+        "classes": [".pos-tag", ".chip", ".tag-filled"],
+        "color": "var(--accent)",
+        "background": "color-mix(in srgb, var(--accent) 12%, transparent)",
+        "border": "none"
+      },
+      "outline_variants": {
+        "classes": [".badge", ".chip-outline", ".tag-outline"],
+        "color": "var(--muted)",
+        "background": "transparent",
+        "border": "1px solid #33373a"
+      }
+    },
+    "labeled_key_value_rows": {
+      "classes": [".kv"],
+      "display": "grid",
+      "grid_template_columns": "132px 1fr",
+      "gap": "14px",
+      "padding": "10px 0",
+      "border_top": "1px solid var(--line-soft)",
+      "tag_style": {
+        "font_family": "var(--font-mono)",
+        "font_size": "13px",
+        "font_weight": "600",
+        "letter_spacing": "0.02em",
+        "color": "var(--brand)"
+      },
+      "variant_alt": {
+        "selector": ".kv.alt .kv-tag",
+        "tag_text": "Another way",
+        "color": "var(--teal)"
+      },
+      "variant_mistake": {
+        "selector": ".kv.mistake .kv-tag, .kv.trap .kv-tag",
+        "tag_text": "Common mistake",
+        "color": "var(--amber)",
+        "text_color": "var(--text)"
+      }
+    }
+  },
+  "agent_execution_rules": [
+    "Rule 1: All documents must render standalone without dependencies on external CSS stylesheets or Tailwind CDNs.",
+    "Rule 2: Never place any text or meta label below 13px.",
+    "Rule 3: Section-specific styling must be driven by parent CSS variable inheritance (--accent: [HUE]) scoped on the wrapping section element.",
+    "Rule 4: Card indicator bars must be 3px wide and use the vertical gradient: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 42%, #000))."
+  ],
+  "tokens": ":root {\n  /* Surface & Background Canvas */\n  --bg: #0f1112;\n  --surface: #16181a;\n  --surface-elevated: #1e2124;\n  --line: #2e3236;\n  --line-strong: #373b40;\n  --line-soft: rgba(63, 63, 70, 0.50);\n\n  /* Typography Hierarchy */\n  --text-heading: #ffffff;\n  --text: #e5e7eb;\n  --text-body: #cfd3d8;\n  --muted: #9ca3af;\n  --faint: #6b7280;\n\n  /* Brand Identity & Ramps */\n  --brand: #ff6b35;\n  --brand-deep: #7e1500;\n  --brand-soft: rgba(255, 107, 53, 0.12);\n  --brand-glow: rgba(255, 107, 53, 0.25);\n\n  /* Immutable Semantic Statuses */\n  --amber: #f0b23e;\n  --amber-soft: rgba(240, 178, 62, 0.12);\n  --amber-glow: rgba(240, 178, 62, 0.25);\n  --teal: #4fb3a9;\n  --teal-soft: rgba(79, 179, 169, 0.12);\n  --teal-glow: rgba(79, 179, 169, 0.25);\n\n  /* Section Domain Hues */\n  --c-vocab: #447F9F;\n  --c-phrasal: #3B8484;\n  --c-colloc: #DE6E55;\n  --c-grammar: #B06D29;\n  --c-idioms: #62193D;\n  --c-focus: #DCE62C;\n  --c-practice: #B98CF0;\n  --c-selfstudy: #6FC3DF;\n  --c-todos-tutor: #9CA3AF;\n  --c-todos-student: #FF6B35;\n\n  /* Active Accent Pointer */\n  --accent: var(--brand);\n  --accent-deep: var(--brand-deep);\n  --accent-soft: var(--brand-soft);\n  --accent-glow: var(--brand-glow);\n\n  /* Typography Families */\n  --font-display: 'Fraunces', Georgia, serif;\n  --font-head: 'Raleway', sans-serif;\n  --font-body: 'Inter', system-ui, sans-serif;\n  --font-mono: 'JetBrains Mono', ui-monospace, monospace;\n\n  /* Gradients */\n  --grad-canvas: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(255, 107, 53, 0.08), transparent);\n  --grad-brand-ramp: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);\n  --grad-card-rail: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 42%, #000));\n\n  /* Radii */\n  --radius-sm: 3px;\n  --radius-md: 6px;\n}"
+}

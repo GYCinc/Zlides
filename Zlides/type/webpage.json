@@ -1,0 +1,6 @@
+{
+  "id": "HTML Project",
+  "name": "HTML Project",
+  "description": "Responsive standalone HTML webpage or SPA",
+  "prompt": "TARGET FORMAT: SEMANTIC HTML5 + Vanilla JS + CSS"
+}

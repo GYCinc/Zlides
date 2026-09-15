@@ -1,0 +1,6 @@
+{
+  "id": "slides",
+  "name": "Slides (16:9)",
+  "description": "16:9 widescreen presentation slide deck",
+  "prompt": "Create a 16:9 widescreen slide deck (1280 × 720 px per slide) as one standalone HTML document — return only the HTML."
+}

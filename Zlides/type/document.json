@@ -1,0 +1,6 @@
+{
+  "id": "document",
+  "name": "Document (A4)",
+  "description": "Structured A4 / printable document format / 210 × 297 mm (8.27 × 11.69 inches), as defined by the ISO 216 international standard",
+  "prompt": "Create a complete A4 portrait worksheet as one standalone HTML document — return only the HTML.\nPages are sequential <div class=\"page\"> blocks, each 210 × 297 mm (width: 210mm; min-height: 297mm). Multi-page is normal when the content needs it — never squeeze content to fit one page.\nComposition: use the full page width; compact multi-column card grids within sections where natural; dense, adult print typography."
+}
