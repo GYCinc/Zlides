@@ -1,3 +1,5 @@
+import { decodeHtmlPayload } from "./rescue.js";
+
 export interface PlaceholderDef {
   type: string;
   id: string;
@@ -124,8 +126,8 @@ export function extractHeadInner(html: string): string {
 
 export function assembleSingleDocument(pageHtmls: string[]): string {
   if (pageHtmls.length === 0) return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="background:#0f1112"></body></html>';
-  const sanitized = pageHtmls.map((p) => p.trim()).filter(Boolean);
-  if (sanitized.length === 0) return pageHtmls[0];
+  const sanitized = pageHtmls.map((p) => decodeHtmlPayload(p.trim())).filter(Boolean);
+  if (sanitized.length === 0) return decodeHtmlPayload(pageHtmls[0] ?? "");
   if (sanitized.length === 1 && (sanitized[0].match(/<!DOCTYPE/gi) || []).length <= 1 && !sanitized[0].includes("<!-- zlides:page-break -->")) {
     return sanitized[0];
   }
@@ -142,24 +144,25 @@ export function assembleSingleDocument(pageHtmls: string[]): string {
 }
 
 export function normalizeSavedHtml(html: string): string {
+  const decoded = decodeHtmlPayload(html);
   const SEP = "<!-- zlides:page-break -->";
-  if (html.includes(SEP)) {
-    const parts = html.split(SEP).map((s) => s.trim()).filter(Boolean);
+  if (decoded.includes(SEP)) {
+    const parts = decoded.split(SEP).map((s) => s.trim()).filter(Boolean);
     return assembleSingleDocument(parts);
   }
-  const dc = (html.match(/<!DOCTYPE/gi) || []).length;
+  const dc = (decoded.match(/<!DOCTYPE/gi) || []).length;
   if (dc > 1) {
-    const parts = html.split(/(?=<!DOCTYPE)/gi).map((s) => s.trim()).filter(Boolean);
+    const parts = decoded.split(/(?=<!DOCTYPE)/gi).map((s) => s.trim()).filter(Boolean);
     if (parts.length > 1) return assembleSingleDocument(parts);
   }
-  return html;
+  return decoded;
 }
 
 export function ensurePlaceholders(pageHtml: string): string {
   if (!pageHtml || pageHtml.trim().length === 0) {
     return injectMissingSections(injectGlobalFallbacks(pageHtml));
   }
-  let html = pageHtml;
+  let html = decodeHtmlPayload(pageHtml);
   for (const ph of CANONICAL_PLACEHOLDERS) {
     if (isPresent(html, ph)) {
       for (const marker of ph.markers) {

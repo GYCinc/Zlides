@@ -37,3 +37,6 @@ frontend_svelte/node_modules
 /public/
 *.pdf
 
+
+# VIG transcript cache
+.vig-cache/

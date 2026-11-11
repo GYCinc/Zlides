@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>{{GUIDE_TITLE}}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style data-purpose="theme-styles">
+  :root {
+    --bg-color: #0f1112;
+    --card-bg: #16181a;
+    --text-primary: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --accent-color: #ff6b35;
+    --vocab-blue: #447F9F;
+    --phrasal-teal: #3B8484;
+    --colloc-terracotta: #DE6E55;
+    --border-color: #3f3f46;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: 'Raleway', sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Mode 1: Study Guide Overview View ── */
+  .overview-container {
+    width: 100%;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .segment-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .vocab-pill {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.25rem 1.4rem;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+  }
+  .vocab-pill:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-3px);
+    background: rgba(255, 107, 53, 0.06);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .accent-gradient-border {
+    border-left: 4px solid;
+    border-image: linear-gradient(to bottom, #ff6b35, #8a1c00) 1;
+  }
+
+  /* ── Mode 2: Viewport-Locked Focus Mode ── */
+  .focus-container {
+    position: fixed;
+    inset: 0;
+    /* Not 100vw: 100vw includes the scrollbar gutter, which left a dead strip on the
+       right edge where the video could have been. inset:0 + width:100% tracks the
+       viewport exactly. */
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--bg-color);
+    padding: clamp(0.35rem, 0.8vh, 0.65rem) clamp(0.5rem, 1vw, 1rem);
+    /* ONE SHARED GRID. Cascade, video and card are placed in the SAME two columns, so the
+       card is exactly as wide as the video BY CONSTRUCTION at every viewport. Previously the
+       card lived in its own full-width section with a separate 26% spacer; that drifted
+       whenever the video became height-constrained and got centred in the leftover space.
+       Do NOT move the card back into an independent full-width section. */
+    display: grid;
+    grid-template-columns: minmax(0, 20%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: clamp(0.75rem, 1.4vw, 1.5rem);
+    row-gap: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    z-index: 50;
+  }
+
+  /* Both sections are dissolved so their children become direct grid items. */
+  .focus-container > .stage-area,
+  .focus-container > .bottom-card-container { display: contents; }
+
+  .focus-container > .flex.items-center { grid-row: 1; grid-column: 1 / -1; }
+  /* In the grid, size-containment makes the automatic minimum size 0, so the cascade
+     collapsed to min-content and wrapped one character per line. Pin it to the column
+     width explicitly and kill the now-meaningless flex basis. */
+  .focus-container .cascade-container {
+    grid-row: 2;
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: none;
+    justify-self: stretch;
+    align-self: stretch;
+  }
+  .focus-container .video-box-wrapper { grid-row: 2; grid-column: 2; }
+  .focus-container .card-spacer     { grid-row: 3; grid-column: 1; }
+  .focus-container .definition-card { grid-row: 3; grid-column: 2; }
+
+  .stage-area {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    gap: clamp(1.25rem, 2.5vw, 2.5rem);
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .cascade-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* Gap and tier sizes are % of the COLUMN's own height (not vh), so the stack
+       always fits whatever the window does. vh-based sizes clipped on short windows. */
+    gap: 4cqh;
+    align-items: flex-end;
+    text-align: right;
+    /* SINGLE BASIS: column = 34% of viewport width, tier sizes in vh (even ladder, bottom word
+       ~7.8vh). Previously these were independent axes (column vw, fonts cqw, height vh),
+       so every proportion drifted at each window size. container-type stays `size`:
+       inline-size collapsed the column to 0 and hid the whole cascade. */
+    flex: 0 0 26%;
+    width: 26%;
+    max-width: 26%;
+    /* SPANS THE FULL STAGE HEIGHT, level with the video. A fixed 60vh stopped the cascade
+       halfway down the player's height, so the descending word had nowhere to land and
+       the bottom slot sprawled into a two-line block. */
+    height: 100%;
+    align-self: stretch;
+    /* Fill the column top-to-bottom so there is NO empty box above the stack. flex-end left
+       a large bare area at the top — a "scattered interests" look on a page about having
+       too many interests. The 5 rows are distributed across the full height. */
+    justify-content: center;
+    user-select: none;
+    padding: 0.25rem 0;
+    flex-shrink: 0;
+    overflow: hidden;
+    /* Establishes the query container the cqh/cqw units resolve against. */
+    container-type: size;
+  }
+
+  .carousel-item {
+    transition: opacity .5s cubic-bezier(.16,1,.3,1),
+              font-size .5s cubic-bezier(.16,1,.3,1),
+              transform .5s cubic-bezier(.16,1,.3,1);
+    will-change: opacity, transform, font-size;
+    cursor: pointer;
+    line-height: 1.02;
+    /* Long words wrap to a second line. Kept normal (not nowrap) so a 4-line wrap of one
+       long term cannot leave a huge empty triangle on the left of the row. */
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow: hidden;
+    text-align: right;
+    /* A word must never exceed the column. max-width + hidden overflow is the backstop that
+       guarantees it even if a font metric surprises us. */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 800;
+    color: var(--text-secondary);
+  }
+
+  /* Tier sizes as a share of the column height. cqh keeps the ladder inside the box at any
+     window size. Values are deliberately conservative: the widest tier must still fit a
+     long phrase inside the column width, so the width budget below does the real work. */
+  /* Each row is a FIXED share of the column height, so the 5 rows tile the column edge to
+       edge with no empty box above and no gap below. Font size is a matching fraction of
+       the same height, so type and position always agree — that is what makes it read as a
+       descent instead of scattered text. Fractions: .56 / .40 / .28 / .19 / .13. */
+  /* TWO CONSTRAINTS, MINIMUM WINS. The height share keeps the ladder's vertical
+     rhythm; the width term keeps the longest phrase on ONE line in a column that
+     is only a fraction of the viewport. --len is the term's rendered length in em
+     (chars x 0.72), set per row by the renderer. Before this, type was driven by
+     height alone inside a width-limited column, so long phrases wrapped and were
+     clipped by overflow:hidden. */
+  .cascade-container .carousel-item.tier-0 { font-size: min(3.1cqh, calc(95cqw / var(--len, 8))); opacity: 0.22; transition-delay: 180ms; }
+  .cascade-container .carousel-item.tier-1 { font-size: min(5cqh, calc(95cqw / var(--len, 8))); opacity: 0.35; transition-delay: 135ms; }
+  .cascade-container .carousel-item.tier-2 { font-size: min(6.9cqh, calc(95cqw / var(--len, 8))); opacity: 0.52; transition-delay: 90ms; }
+  .cascade-container .carousel-item.tier-3 { font-size: min(8.8cqh, calc(95cqw / var(--len, 8))); opacity: 0.75; transition-delay: 45ms; }
+  .cascade-container .carousel-item.tier-4 { font-size: min(11.2cqh, calc(95cqw / var(--len, 8))); opacity: 1; transition-delay: 0ms; }
+
+  .carousel-item.carousel-in { animation: vig-in .55s cubic-bezier(.16,1,.3,1); }
+  @keyframes vig-in { from { transform: translateY(26px) scale(.88); opacity: 0; } }
+
+  .carousel-item.vig-exit { opacity: 0 !important; transform: translateY(46px) scale(1.06); pointer-events: none; }
+
+  @keyframes vig-pop { 0% { transform: scale(.94); opacity: .55; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+  .vig-pop { animation: vig-pop .4s cubic-bezier(.16,1,.3,1); }
+  .carousel-item:hover {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    transform: translateX(-4px);
+  }
+
+  .video-box-wrapper {
+    /* Fits a 16:9 box inside its grid cell: width first, then max-height clamps it and
+       aspect-ratio pulls the width back in. Height-constrained viewports stay centred. */
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 16 / 9;
+    align-self: center;
+    justify-self: center;
+    position: relative;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+    flex-shrink: 1;
+  }
+  .video-box-wrapper iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  /* ── Hardcoded Subtitle Overlay & Input Enhancement ── */
+  .vig-target {
+    color: #ff6b35;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(255, 107, 53, 0.6);
+    border-bottom: 2px solid #ff6b35;
+  }
+
+  .bottom-card-container {
+    /* Dissolved by the shared grid — its children are placed directly by
+       .focus-container. Nothing here controls the card's width any more. */
+  }
+
+  /* Occupies grid column 1 on row 3 so the card starts at the video's left edge. */
+  .card-spacer {
+    display: block;
+  }
+
+  .definition-card {
+    position: relative;
+    grid-row: 3;
+    grid-column: 2;
+    background: var(--card-bg);
+    padding: clamp(0.75rem, 1.8vh, 1.25rem) clamp(1rem, 2vw, 1.75rem);
+    border-radius: 0 12px 12px 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .hidden-mode {
+    display: none !important;
+  }
+
+  /* ── Handoff: the word that just played flies into the card ── */
+  .vig-ghost {
+    position: fixed;
+    z-index: 60;
+    pointer-events: none;
+    font-family: 'Raleway', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+    white-space: nowrap;
+    color: #9ca3af;
+    will-change: transform, opacity;
+    transition: transform 420ms cubic-bezier(.22, 1, .36, 1),
+                color 420ms cubic-bezier(.22, 1, .36, 1),
+                opacity 140ms ease-in 280ms;
+  }
+
+  /* The card's accent rail refills on the same beat, so the landing has a
+     destination cue rather than the word just vanishing into text. */
+  .definition-card::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to bottom, #ffb347, rgba(255, 107, 53, 0));
+    transform: scaleY(0);
+    transform-origin: top;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .definition-card.vig-handoff::after {
+    animation: vig-rail-sweep 620ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  @keyframes vig-rail-sweep {
+    0%   { transform: scaleY(0); opacity: 1; }
+    55%  { transform: scaleY(1); opacity: 1; }
+    100% { transform: scaleY(1); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vig-ghost { display: none; }
+    .definition-card.vig-handoff::after { animation: none; }
+  }
+</style>
+</head>
+<body class="antialiased">
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- MODE 1: STUDY GUIDE OVERVIEW (Full Segmented Curriculum)       -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="vig-overview-mode" class="overview-container">
+
+  <!-- Header & Metadata -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-[#3f3f46] gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="bg-[#ff6b35]/20 text-[#ff6b35] border border-[#ff6b35] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Immersion Guide</span>
+      </div>
+      <h1 class="text-3xl md:text-5xl text-white font-black uppercase tracking-tight font-['Raleway'] mt-2">{{GUIDE_TITLE}}</h1>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-6 text-sm text-[#9ca3af]">
+      <div><span class="text-white font-extrabold text-lg" id="ov-vocab-count">33</span> Targets</div>
+      <div class="w-px h-6 bg-[#3f3f46]"></div>
+      <div><span class="text-white font-extrabold text-lg" id="ov-seg-count">5</span> Segments</div>
+      <div class="w-px h-6 bg-[#3f3f46]"></div>
+      <div><span class="text-white font-extrabold text-lg" id="ov-wpm">~148</span> WPM</div>
+    </div>
+  </header>
+
+  <!-- Hero Video Start Card -->
+  <section class="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-[#3f3f46] shadow-2xl group flex items-center justify-center">
+    <img id="ov-thumb-img" alt="Video Thumbnail" class="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" src="https://img.youtube.com/vi/{{VIDEO_ID}}/maxresdefault.jpg"/>
+    
+    <button id="btn-start-hero" class="relative z-10 flex items-center gap-4 bg-[#ff6b35] hover:bg-[#ff5517] text-white px-9 py-5 rounded-full font-black text-xl md:text-2xl uppercase tracking-wider shadow-2xl transition-all transform hover:scale-105 active:scale-95 font-['Raleway']">
+      <svg fill="currentColor" height="28" viewBox="0 0 24 24" width="28"><path d="M8 5v14l11-7z"/></svg>
+      <span>Start Video Immersion</span>
+    </button>
+  </section>
+
+  <!-- Segmented Curriculum Section -->
+  <section class="flex flex-col gap-8" id="ov-segments-container">
+    <!-- Injected dynamically per segment -->
+  </section>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- MODE 2: CINEMA FOCUS IMMERSION (Active Watching Viewport)      -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="vig-focus-mode" class="focus-container hidden-mode">
+
+  <!-- Top Controls Bar -->
+  <div class="flex items-center justify-between w-full px-2">
+    <button id="btn-back-overview" class="flex items-center gap-2 text-sm text-[#9ca3af] hover:text-white transition-colors bg-white/5 hover:bg-white/10 px-3.5 py-1.5 rounded-full border border-white/10 font-semibold">
+      <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="m15 18-6-6 6-6"/></svg>
+      <span>← Study Overview</span>
+    </button>
+
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-[#ff6b35] font-extrabold uppercase tracking-wider bg-[#ff6b35]/15 px-2.5 py-0.5 rounded font-['Raleway']" id="focus-segment-indicator">SEGMENT 1: THE OFFSHORE REVOLUTION</span>
+      <span class="text-xs text-white font-mono font-bold bg-white/10 border border-white/15 px-2.5 py-0.5 rounded" id="vig-live-clock">0:00</span>
+    </div>
+  </div>
+
+  <!-- Row 1: Cascade (Left) + Video Player with Subtitles (Right) -->
+  <section class="stage-area">
+    
+    <!-- Left: Upcoming Words Cascade (With Timestamps) -->
+    <div class="cascade-container" id="vig-inactive-words-container">
+      <!-- Injected dynamically -->
+    </div>
+
+    <!-- Right: 16:9 Video Player Frame + Subtitle Overlay -->
+    <div class="video-box-wrapper">
+      <div id="vig-player-mount" class="w-full h-full"></div>
+
+      <!-- Hardcoded In-Video Subtitles (calc(10% - 25px), 38% backdrop, 24px desktop font) -->
+      <div id="vig-subtitle-overlay" class="absolute left-[4%] right-[4%] flex justify-center text-center z-20 pointer-events-none transition-opacity duration-150" style="bottom: calc(10% - 25px); opacity: 0;">
+        <span id="vig-subtitle-text" class="inline-block bg-black/[0.38] backdrop-blur-[2px] text-white font-['Raleway'] font-extrabold text-base sm:text-lg lg:text-[24px] px-5 py-2 rounded-xl leading-snug max-w-[92%] tracking-wide" style="text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.85), -1px -1px 0 rgba(0,0,0,0.8), 1px -1px 0 rgba(0,0,0,0.8), -1px 1px 0 rgba(0,0,0,0.8), 1px 1px 0 rgba(0,0,0,0.8);">
+        </span>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Row 2: Active Word Definition Card -->
+  <section class="bottom-card-container">
+    <div class="card-spacer hidden md:block"></div>
+
+    <div class="accent-gradient-border definition-card">
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <h2 class="text-3xl lg:text-4xl font-black uppercase text-white tracking-tight leading-none font-['Raleway']" id="vig-active-word"></h2>
+        <span class="text-xs font-mono font-bold text-[#ff6b35] bg-[#ff6b35]/15 border border-[#ff6b35]/30 px-2 py-0.5 rounded" id="vig-active-time">--:--</span>
+        <span class="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-[#447F9F]/20 text-[#447F9F] border border-[#447F9F]/40" id="vig-active-type">VOCABULARY</span>
+      </div>
+      
+      <div class="text-[#9ca3af] text-xs lg:text-sm font-mono mt-0.5" id="vig-active-ipa"></div>
+      
+      <div class="text-[#e5e7eb] text-lg lg:text-2xl leading-tight mt-1 font-medium" id="vig-active-def"></div>
+      <div class="mt-1.5 flex items-start gap-2 text-sm lg:text-base text-zinc-100 italic border-l-2 border-[#ff6b35] pl-3 py-1.5 bg-white/5 rounded-r" id="vig-active-context-wrap">
+        <span class="text-[#ff6b35] not-italic font-extrabold text-xs uppercase tracking-wider shrink-0 pt-0.5">In Video</span>
+        <span id="vig-active-context" class="leading-snug"></span>
+      </div>
+      <div class="text-[#9ca3af] text-sm lg:text-base mt-1.5" id="vig-active-colloc"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  window.VIG_VIDEO_ID = "{{VIDEO_ID}}";
+  window.VIG_TRANSCRIPT = {{TRANSCRIPT_JSON}};
+  window.VIG_VOCAB = {{VOCAB_JSON}};
+</script>
+<script>
+(function() {
+  'use strict';
+  var VIDEO_ID = window.VIG_VIDEO_ID;
+  var TRANSCRIPT = Array.isArray(window.VIG_TRANSCRIPT) ? window.VIG_TRANSCRIPT : [];
+  var DATA = window.VIG_VOCAB;
+
+  var VOCAB = [];
+  var SEGMENTS = [];
+
+  if (DATA && Array.isArray(DATA.segments)) {
+    SEGMENTS = DATA.segments;
+    for (var s = 0; s < SEGMENTS.length; s++) {
+      if (Array.isArray(SEGMENTS[s].items)) {
+        for (var it = 0; it < SEGMENTS[s].items.length; it++) {
+          var item = SEGMENTS[s].items[it];
+          item.segmentId = SEGMENTS[s].id;
+          item.segmentTitle = SEGMENTS[s].title;
+          item.segmentNumber = SEGMENTS[s].number;
+          VOCAB.push(item);
+        }
+      }
+    }
+  } else if (Array.isArray(DATA)) {
+    VOCAB = DATA;
+  }
+
+  VOCAB.sort(function(a, b) { return (a.timestamp || 0) - (b.timestamp || 0); });
+
+  // The skill mandates four distinct categories. Render each one honestly.
+  var TYPE_STYLES = {
+    phrasal_verb: { label: 'Phrasal Verb', class: 'bg-[#3B8484]/20 text-[#3B8484] border-[#3B8484]/40' },
+    vocabulary:   { label: 'Vocabulary',   class: 'bg-[#447F9F]/20 text-[#447F9F] border-[#447F9F]/40' },
+    collocation:  { label: 'Collocation',  class: 'bg-[#B5883C]/20 text-[#D9A441] border-[#B5883C]/40' },
+    idiom:        { label: 'Idiom',        class: 'bg-[#A9607E]/20 text-[#D07FA0] border-[#A9607E]/40' }
+  };
+
+  var player = null, syncInterval = null, currentIdx = 0, isFocusMode = false;
+
+  function formatTime(s) {
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function getContextSentence(item) {
+    if (!item) return '';
+    if (item.contextSentence) return item.contextSentence;
+    var t = (typeof item.timestamp === 'number') ? item.timestamp : null;
+    if (t === null) return '';
+    for (var i = 0; i < TRANSCRIPT.length; i++) {
+      if (t >= TRANSCRIPT[i].start && t <= TRANSCRIPT[i].end) return TRANSCRIPT[i].text;
+    }
+    return '';
+  }
+
+  function formatContextSentence(sentence, term) {
+    if (!sentence) return '';
+    var safe = sentence.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (term) {
+      var re = new RegExp('\\b(' + escapeRegExp(term) + ')\\b', 'gi');
+      safe = safe.replace(re, '<span class="vig-target">$1</span>');
+    }
+    return safe;
+  }
+
+  function getIpa(item) {
+    return (item && typeof item.ipa === 'string' && item.ipa.trim()) ? item.ipa.trim() : '';
+  }
+
+  /* ── 1. Populate Mode 1: Raleway Typography & Clear Cards ── */
+  function renderOverviewGrid() {
+    var countEl = document.getElementById('ov-vocab-count');
+    if (countEl) countEl.textContent = VOCAB.length;
+
+    var segCountEl = document.getElementById('ov-seg-count');
+    if (segCountEl && SEGMENTS.length) segCountEl.textContent = SEGMENTS.length;
+
+    var container = document.getElementById('ov-segments-container');
+    if (!container) return;
+
+    var html = '';
+
+    if (SEGMENTS.length > 0) {
+      for (var i = 0; i < SEGMENTS.length; i++) {
+        var seg = SEGMENTS[i];
+        html += '<div class="segment-card">'
+              + '  <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-white/10 gap-3">'
+              + '    <div>'
+              + '      <span class="text-xs font-mono font-extrabold text-[#ff6b35] tracking-wider uppercase">Segment ' + seg.number + ' · ' + formatTime(seg.timestamp) + ' – ' + formatTime(seg.endTimestamp) + '</span>'
+              + '      <h3 class="text-2xl md:text-3xl text-white font-black uppercase font-[\'Raleway\'] mt-1">' + seg.title + '</h3>'
+              + '    </div>'
+              + '    <button class="self-start md:self-auto bg-white/10 hover:bg-[#ff6b35] text-white text-sm font-extrabold px-5 py-2.5 rounded-full uppercase tracking-wider transition-colors btn-play-seg font-[\'Raleway\']" data-start="' + seg.timestamp + '">▶ Play Segment</button>'
+              + '  </div>'
+              + '  <div>'
+              + '    <div class="text-xs font-extrabold text-[#9ca3af] uppercase tracking-wider mb-1.5">Context & Argument (Schema Activation)</div>'
+              + '    <p class="text-base text-gray-200 leading-relaxed font-medium">' + seg.schemaActivation.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-[#ff6b35] font-bold">$1</strong>') + '</p>'
+              + '  </div>'
+              + '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">';
+        
+        for (var j = 0; j < seg.items.length; j++) {
+          var it = seg.items[j];
+          var typeColor = TYPE_STYLES[it.type] ? TYPE_STYLES[it.type].class : TYPE_STYLES.vocabulary.class;
+          var typeLabel = TYPE_STYLES[it.type] ? TYPE_STYLES[it.type].label : TYPE_STYLES.vocabulary.label;
+          var itIpa = getIpa(it);
+
+          html += '    <div class="vocab-pill flex flex-col justify-between gap-3" data-timestamp="' + it.timestamp + '">'
+                + '      <div>'
+                + '        <div class="flex items-baseline justify-between gap-2">'
+                + '          <span class="font-black text-xl text-white font-[\'Raleway\'] uppercase tracking-tight">' + it.term + '</span>'
+                + '          <span class="text-xs font-mono font-bold text-[#ff6b35] bg-[#ff6b35]/10 px-2 py-0.5 rounded">' + formatTime(it.timestamp) + '</span>'
+                + '        </div>'
+                + '        <div class="flex items-center gap-2 mt-1">'
+                + '          <span class="text-[11px] uppercase font-extrabold px-2 py-0.5 rounded border ' + typeColor + '">' + typeLabel + '</span>'
+                + (itIpa ? '          <span class="text-xs font-mono text-[#9ca3af]">' + itIpa + '</span>' : '')
+                + '        </div>'
+                + '        <p class="text-base text-gray-100 font-semibold leading-normal mt-2.5">' + it.definition + '</p>'
+                + (getContextSentence(it) ? '        <div class="mt-2.5 flex items-start gap-2 text-xs text-zinc-300 italic border-l-2 border-[#ff6b35] pl-2.5 py-1 bg-white/5 rounded-r"><span class="text-[#ff6b35] not-italic font-bold text-[11px] uppercase tracking-wider shrink-0">In Video:</span><span>' + formatContextSentence(getContextSentence(it), it.term) + '</span></div>' : '')
+                + '      </div>'
+                + (it.collocations ? '      <div class="text-xs text-[#9ca3af] pt-2 border-t border-white/10">💡 <strong class="text-[#ff6b35] font-bold">' + it.collocations + '</strong></div>' : '')
+                + '    </div>';
+        }
+
+        html += '  </div>'
+              + '</div>';
+      }
+    }
+
+    container.innerHTML = html;
+
+    var segBtns = container.querySelectorAll('.btn-play-seg');
+    segBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var sec = parseFloat(btn.getAttribute('data-start'));
+        enterFocusMode(sec);
+      });
+    });
+
+    var pills = container.querySelectorAll('.vocab-pill');
+    pills.forEach(function(pill) {
+      pill.addEventListener('click', function() {
+        var sec = parseFloat(pill.getAttribute('data-timestamp'));
+        enterFocusMode(sec);
+      });
+    });
+  }
+
+  /* ── 2. Mode Transition Engine ── */
+  function enterFocusMode(seekSec, skipPlay) {
+    isFocusMode = true;
+    var ov = document.getElementById('vig-overview-mode');
+    var fc = document.getElementById('vig-focus-mode');
+
+    if (ov) ov.classList.add('hidden-mode');
+    if (fc) fc.classList.remove('hidden-mode');
+
+    if (player) {
+      if (typeof seekSec === 'number' && !isNaN(seekSec)) {
+        player.seekTo(seekSec, true);
+      }
+      if (!skipPlay) player.playVideo();
+    }
+    if (typeof tick === 'function') tick();
+  }
+
+  function exitFocusMode() {
+    isFocusMode = false;
+    var ov = document.getElementById('vig-overview-mode');
+    var fc = document.getElementById('vig-focus-mode');
+
+    if (fc) fc.classList.add('hidden-mode');
+    if (ov) ov.classList.remove('hidden-mode');
+
+    if (player && typeof player.pauseVideo === 'function') {
+      player.pauseVideo();
+    }
+  }
+
+  /* ── 3. Mode 2 (Focus Mode Cascade with Integrated Timestamps) ── */
+    var cascadeNodes = {};   // idx -> persistent element (framework: nodes persist, classes flip)
+  var CASCADE_WINDOW = 5;
+  var TIER_NAMES = ['tier-0','tier-1','tier-2','tier-3','tier-4'];
+
+  // d = distance from the soonest word. d=0 is the SOONEST, which sits at the BOTTOM of
+// the column (descending sort below appends it last). tier-4 = biggest/fully opaque is
+// assigned to d=0, so size + opacity INCREASE as words descend toward the active card:
+// words enter small and faint at the top and grow until they align with the card.
+  function applyTier(el, d) {
+    var tierIdx = (CASCADE_WINDOW - 1) - d;
+    for (var t = 0; t < 5; t++) el.classList[t === tierIdx ? 'add' : 'remove'](TIER_NAMES[t]);
+    el.style.transitionDelay = ((CASCADE_WINDOW - 1 - d) * 45) + 'ms';
+  }
+
+  /* Sizes computed from the column itself, then forced to descend: a long term at a
+     low tier must never render larger than the soonest word below it. */
+  /* The soonest word sets the scale; every rung above it is a fixed fraction of that
+     scale, capped by its own one-line width budget. Derived from the column, so the
+     ladder descends at any viewport and a long term can never invert it. */
+  var TIER_RATIO = [0.37, 0.49, 0.63, 0.8, 1];
+  function sizeCascade(ordered, needed) {
+    var container = document.getElementById('vig-inactive-words-container');
+    if (!container) return;
+    var H = container.clientHeight;
+    var W = container.clientWidth;
+    if (!H || !W || !ordered.length) return;
+    var soonest = ordered[ordered.length - 1];
+    var soonTerm = (VOCAB[soonest] && VOCAB[soonest].term) ? VOCAB[soonest].term : '';
+    var avail = W * 0.95 - 46;  // the timestamp sits inline before each word
+    var soonFit = soonTerm.length ? avail / (soonTerm.length * 0.72) : H;
+    var base = Math.min(0.112 * H, soonFit);
+    for (var i = 0; i < ordered.length; i++) {
+      var idx = ordered[i];
+      var tier = Math.max(0, Math.min(4, 4 - (needed[idx] || 0)));
+      var term = (VOCAB[idx] && VOCAB[idx].term) ? VOCAB[idx].term : '';
+      var fit = term.length ? avail / (term.length * 0.72) : H;
+      var size = Math.min(base * TIER_RATIO[tier], fit);
+      if (fit >= 13) size = Math.max(size, 13);
+      var el = cascadeNodes[idx];
+      if (el) el.style.fontSize = size + 'px';
+    }
+  }
+
+  function renderInactiveWords(activeIdx) {
+    var container = document.getElementById('vig-inactive-words-container');
+    if (!container) return;
+
+    var nextStart = activeIdx + 1;
+    var needed = {}, ordered = [];
+    for (var d = CASCADE_WINDOW - 1; d >= 0; d--) {
+      var idx = nextStart + d;
+      if (idx < VOCAB.length) { needed[idx] = d; ordered.push(idx); }
+    }
+    // DESCENDING: the SOONEST word is appended LAST => sits at the BOTTOM of the column,
+// directly above the active card. Words enter small+faint at the top ("climbing out of
+// the darkness") and grow + brighten as they descend toward the card.
+    ordered.sort(function(a, b) { return b - a; });
+
+    // exit: words consumed by the active card slide out toward it
+    Object.keys(cascadeNodes).forEach(function(k) {
+      var idx = +k;
+      if (needed[idx] === undefined) {
+        var el = cascadeNodes[idx];
+        delete cascadeNodes[idx];
+        el.classList.add('vig-exit');
+        setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 430);
+      }
+    });
+
+    if (ordered.length === 0) {
+      container.innerHTML = '<div class="text-xs text-gray-500 my-auto font-[\'Raleway\'] font-bold">Session Complete \ud83c\udf89</div>';
+      return;
+    }
+
+    // create missing (ascending: furthest first = top of cascade)
+    ordered.forEach(function(idx) {
+      if (cascadeNodes[idx]) return;
+      var el = document.createElement('div');
+      el.className = 'carousel-item tier-0 carousel-in';
+      el.setAttribute('data-index', idx);
+      // Fit long phrases to the column. Measured at 12cqh the widest tier, a 30-char phrase
+      // needed ~640px against a 380px column, so long words were clipped. Scale against the
+      // longest term in the deck so the ratio stays gentle, then hard-clamp any term that is
+      // still too long by character count so nothing can ever exceed the column width.
+      // Long phrases WRAP to a second line rather than shrink. The earlier char-count clamp
+      // made the soonest word the smallest thing on screen — the opposite of its job.
+      // Only a light nudge for very long phrases, which would otherwise dominate.
+      // Width budget for this term: its own length decides how large it may get,
+      // so a long phrase can never wrap or be clipped by the column.
+      el.style.setProperty('--len', String(Math.max(1, VOCAB[idx].term.length * 0.72)));
+      el.innerHTML = '<span class="text-xs font-mono font-bold text-[#ff6b35] opacity-75 tracking-normal shrink-0">' + formatTime(VOCAB[idx].timestamp) + '</span>'
+                   + '<span>' + VOCAB[idx].term.toUpperCase() + '</span>';
+      el.addEventListener('click', function() {
+        var i = parseInt(el.getAttribute('data-index'), 10);
+        if (!isNaN(i) && VOCAB[i] && player && player.seekTo) player.seekTo(VOCAB[i].timestamp, true);
+      });
+      container.appendChild(el);
+      cascadeNodes[idx] = el;
+      // double rAF: element mounts at tier-0, then transitions into its real tier
+      requestAnimationFrame(function(){ requestAnimationFrame(function() {
+        el.classList.remove('carousel-in');
+        if (cascadeNodes[idx] === el) applyTier(el, needed[idx] !== undefined ? needed[idx] : 0);
+      }); });
+    });
+
+    // Reorder DOM nodes to match visual order (furthest at top, soonest at bottom).
+    // New nodes were appended at the end of the container; appendChild MOVES an
+    // existing node to the end, so iterating the descending `ordered` array rebuilds
+    // the correct DOM order: furthest word first (top), soonest word last (bottom).
+    ordered.forEach(function(idx) {
+      var el = cascadeNodes[idx];
+      if (el && el.parentNode === container) container.appendChild(el);
+    });
+
+    // persistent nodes transition between tiers — the whole stack breathes upward
+    ordered.forEach(function(idx) { applyTier(cascadeNodes[idx], needed[idx]); });
+    sizeCascade(ordered, needed);
+  }
+
+  function updateActiveDetails(v) {
+    var wordEl = document.getElementById('vig-active-word');
+    var timeEl = document.getElementById('vig-active-time');
+    var typeEl = document.getElementById('vig-active-type');
+    var ipaEl = document.getElementById('vig-active-ipa');
+    var defEl = document.getElementById('vig-active-def');
+    var collocEl = document.getElementById('vig-active-colloc');
+    var segIndicator = document.getElementById('focus-segment-indicator');
+
+    if (!v) return;
+
+    if (wordEl) {
+      wordEl.textContent = v.term.toUpperCase();
+      wordEl.classList.remove('vig-pop');
+      void wordEl.offsetWidth;
+      wordEl.classList.add('vig-pop');
+    }
+    if (timeEl && v.timestamp !== undefined) {
+      timeEl.textContent = formatTime(v.timestamp);
+    }
+    if (typeEl) {
+      var tStyle = TYPE_STYLES[v.type] || TYPE_STYLES.vocabulary;
+      typeEl.textContent = tStyle.label.toUpperCase();
+      typeEl.className = 'text-xs font-bold uppercase px-2 py-0.5 rounded ' + tStyle.class;
+    }
+    if (ipaEl) { var ipa = getIpa(v); ipaEl.textContent = ipa; ipaEl.style.display = ipa ? '' : 'none'; }
+    if (defEl) {
+      // Card shows ONLY the first sentence. The full definition (rule + analogy) stays in
+      // the overview grid. The card is watched while the video plays — it must be one glance.
+      var firstSentence = String(v.definition || '').split(/(?<=\.)\s+/)[0] || v.definition;
+      defEl.textContent = firstSentence;
+    }
+    var contextWrap = document.getElementById('vig-active-context-wrap');
+    var contextEl = document.getElementById('vig-active-context');
+    var ctxSentence = getContextSentence(v);
+    // The active card stays deliberately minimal: word, time, type, IPA/CEFR, definition.
+    // The in-video sentence and collocations are still shown in the OVERVIEW grid, so the
+    // evidence is not lost — it just stops crowding the card the learner is watching.
+    if (ctxSentence && contextEl && contextWrap) {
+      contextEl.innerHTML = formatContextSentence(ctxSentence, v.term);
+      contextWrap.style.display = 'none';
+    } else if (contextWrap) {
+      contextWrap.style.display = 'none';
+    }
+
+    if (collocEl) {
+      if (v.collocations) {
+        collocEl.innerHTML = '💡 Collocation: <span class="text-[#ff6b35] font-bold">' + v.collocations + '</span>';
+        collocEl.style.display = 'none';
+      } else {
+        collocEl.style.display = 'none';
+      }
+    }
+    if (segIndicator && v.segmentTitle) {
+      segIndicator.textContent = 'SEGMENT ' + (v.segmentNumber || 1) + ': ' + v.segmentTitle.toUpperCase();
+    }
+  }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  /* Fly the consumed word from its cascade row into the card's title zone.
+     The destination is the card's fixed title anchor, not the incoming term's
+     box, so the flight is identical whatever word follows. */
+  function launchHandoff(node) {
+    if (!node || !node.isConnected || prefersReducedMotion()) return;
+    var wordSpan = node.querySelector('span:last-child');
+    var cardTerm = document.getElementById('vig-active-word');
+    var card = document.querySelector('.definition-card');
+    if (!wordSpan || !cardTerm || !card) return;
+
+    var from = wordSpan.getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect();
+    var fromFont = parseFloat(window.getComputedStyle(wordSpan).fontSize) || 0;
+    var targetFont = parseFloat(window.getComputedStyle(cardTerm).fontSize) || 0;
+    if (from.width < 4 || fromFont < 1 || targetFont < 1) return;
+
+    var targetLeft = cardRect.left + 24;
+    var targetTop = cardRect.top + 18;
+    var scale = targetFont / fromFont;
+
+    var ghost = document.createElement('div');
+    ghost.className = 'vig-ghost';
+    ghost.textContent = wordSpan.textContent;
+    ghost.style.left = from.left + 'px';
+    ghost.style.top = from.top + 'px';
+    ghost.style.fontSize = fromFont + 'px';
+    ghost.style.transformOrigin = 'left top';
+    (document.body || document.documentElement).appendChild(ghost);
+
+    // The card stays silent until the word arrives, then lands with the pop.
+    cardTerm.style.opacity = '0';
+    card.classList.add('vig-handoff');
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        ghost.style.transform = 'translate(' + (targetLeft - from.left) + 'px,' + (targetTop - from.top) + 'px) scale(' + scale + ')';
+        ghost.style.color = '#ffffff';
+        ghost.style.opacity = '0';
+      });
+    });
+
+    setTimeout(function () {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      cardTerm.style.opacity = '';
+      cardTerm.classList.remove('vig-pop');
+      void cardTerm.offsetWidth;
+      cardTerm.classList.add('vig-pop');
+    }, 360);
+
+    setTimeout(function () { card.classList.remove('vig-handoff'); }, 700);
+  }
+
+  function tick() {
+    if (!player || typeof player.getCurrentTime !== 'function') return;
+    var t = player.getCurrentTime();
+
+    var clockEl = document.getElementById('vig-live-clock');
+    if (clockEl) {
+      clockEl.textContent = formatTime(t);
+    }
+
+    // 1. Sync Active Vocabulary Card (3.5s post-spoken hold, then shift immediately to the next upcoming word)
+    var POST_WORD_HOLD = 3.5;
+    var idx = VOCAB.length > 0 ? VOCAB.length - 1 : 0;
+    for (var j = 0; j < VOCAB.length; j++) {
+      if (t <= (VOCAB[j].timestamp || 0) + POST_WORD_HOLD) {
+        idx = j;
+        break;
+      }
+    }
+
+    if (idx !== currentIdx) {
+      var previousIdx = currentIdx;
+      var step = idx - previousIdx;
+      currentIdx = idx;
+      // Only a natural one-word advance earns the flight; a seek or a jump would
+      // teleport a word that was never on screen.
+      if (step === 1) launchHandoff(cascadeNodes[previousIdx]);
+      renderInactiveWords(idx);
+      updateActiveDetails(VOCAB[idx]);
+    }
+
+    // 2. Sync Hardcoded In-Video Subtitle (Continuous display, bridging pauses until next cue)
+    var activeCue = null;
+    for (var c = 0; c < TRANSCRIPT.length; c++) {
+      var cue = TRANSCRIPT[c];
+      var nextStart = (c + 1 < TRANSCRIPT.length) ? TRANSCRIPT[c + 1].start : (cue.end + 2.5);
+      var maxHold = Math.min(nextStart, Math.max(cue.end, cue.end + 2.0));
+      if (t >= cue.start && t < maxHold) {
+        activeCue = cue;
+        break;
+      }
+    }
+
+    var subOverlay = document.getElementById('vig-subtitle-overlay');
+    var subText = document.getElementById('vig-subtitle-text');
+
+    if (activeCue && subOverlay && subText) {
+      var rawText = activeCue.text;
+      for (var k = 0; k < VOCAB.length; k++) {
+        var term = VOCAB[k].term;
+        if (term) {
+          var re = new RegExp('\\b(' + escapeRegExp(term) + ')\\b', 'gi');
+          rawText = rawText.replace(re, '<span class="vig-target font-black">$1</span>');
+        }
+      }
+      subText.innerHTML = rawText;
+      subOverlay.style.opacity = '1';
+    } else if (subOverlay) {
+      subOverlay.style.opacity = '0';
+    }
+  }
+
+  function onState(e) {
+    // Re-suppress native CC on every state change: YouTube re-enables the caption
+    // track during playback, which duplicates the VIG subtitle overlay.
+    try { if (player && player.unloadModule) player.unloadModule('captions'); } catch (err) {}
+    try { if (player && player.setOption) player.setOption('captions', 'hidden', true); } catch (err) {}
+
+    // Keep the clock-driven render running for every state EXCEPT unstarted/ended.
+    // Previously it only ran on PLAYING, so scrubbing or seeking while paused left
+    // the cascade frozen on card 1 and never advanced.
+    var clockStates = [
+      YT.PlayerState.PLAYING, YT.PlayerState.BUFFERING,
+      YT.PlayerState.PAUSED, YT.PlayerState.SEEKING, YT.PlayerState.CUED
+    ];
+    if (clockStates.indexOf(e.data) !== -1) {
+      if (!syncInterval) syncInterval = setInterval(tick, 100);
+      tick(); // re-sync immediately so a seek/pause updates without waiting for the next poll
+    } else {
+      if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+    }
+
+    if (e.data === YT.PlayerState.PLAYING) {
+      if (!isFocusMode) {
+        enterFocusMode();
+      }
+    }
+  }
+
+  function buildPlayer() {
+    if (!VIDEO_ID) return;
+    window.player = player = new YT.Player('vig-player-mount', {
+      videoId: VIDEO_ID,
+      playerVars: {
+        playsinline: 1,
+        rel: 0,
+        cc_load_policy: 0,
+        // NOTE: do NOT set cc_lang_pref to '' — an empty value makes the player throw
+        // "Error 153: Video player configuration error". Captions are killed via the API
+        // in onReady/onState instead.
+        hl: 'en',
+        iv_load_policy: 3,
+        controls: 1,
+        modestbranding: 1
+      },
+      events: {
+          onReady: function(e) {
+            // VIG renders its own subtitle overlay; kill YouTube's native CC track.
+            // It lives inside a cross-origin iframe, so CSS cannot reach it — must use the API.
+            try { if (e && e.target && e.target.unloadModule) e.target.unloadModule('captions'); } catch (err) {}
+            try { if (e && e.target && e.target.getPlayerState) e.target.setOption('captions', 'hidden', true); } catch (err) {}
+            if (e && e.target && e.target.getAvailableSubtitles) {
+              var langs = e.target.getAvailableSubtitles() || {};
+              Object.keys(langs).forEach(function (code) {
+                try { e.target.setOption('captions', 'track', ''); } catch (err) {}
+                try { e.target.hideCaptions(); } catch (err) {}
+              });
+            }
+          },
+          onStateChange: function(e) {
+            if (typeof YT === 'undefined' || !YT.PlayerState) return;
+            onState(e);
+          }
+        }
+    });
+  }
+
+  function init() {
+    currentIdx = 0;
+    renderOverviewGrid();
+    updateActiveDetails(VOCAB[0]);
+    // Lay out the focus stage immediately. Previously the whole stage stayed display:none
+    // until playback started, which meant a paused/scrubbed page measured 0x0 and the
+    // cascade could not be inspected before the video ran. Sizing comes AFTER this,
+    // because a hidden container measures 0x0 and the cascade sizes itself from it.
+    enterFocusMode(0, true);
+    renderInactiveWords(0);
+    window.addEventListener('resize', function () { renderInactiveWords(currentIdx); });
+
+    var btnStartHero = document.getElementById('btn-start-hero');
+    if (btnStartHero) {
+      btnStartHero.addEventListener('click', function() {
+        enterFocusMode(0);
+      });
+    }
+
+    var btnBack = document.getElementById('btn-back-overview');
+    if (btnBack) {
+      btnBack.addEventListener('click', exitFocusMode);
+    }
+
+    if (!window.YT) {
+      var tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      var first = document.getElementsByTagName('script')[0];
+      if (first && first.parentNode) first.parentNode.insertBefore(tag, first);
+      else document.head.appendChild(tag);
+      window.onYouTubeIframeAPIReady = buildPlayer;
+    } else {
+      buildPlayer();
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>

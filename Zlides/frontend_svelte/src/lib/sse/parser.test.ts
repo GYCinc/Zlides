@@ -193,7 +193,19 @@ describe("LIVE REALITY: add_slide output delta assembly", () => {
       ].join("\n"),
     );
 
-    expect(events.map((e) => e.kind)).toEqual(["page", "answer"]);
+    expect(events.map((e) => e.kind)).toEqual([
+      "page_progress", "page_progress", "page", "answer",
+    ]);
+    const progress = events.filter(
+      (e): e is Extract<SseEvent, { kind: "page_progress" }> => e.kind === "page_progress",
+    );
+    expect(progress.map((p) => p.html)).toEqual([
+      "<!DOCTYPE html>\n<html>\n<body>BANANA",
+      "<!DOCTYPE html>\n<html>\n<body>BANANA</body>\n</html>",
+    ]);
+    expect(progress[0]!.position).toBe(1);
+    expect(progress[0]!.title).toBe("BANANA");
+    expect(progress[0]!.bytes).toBe(progress[0]!.html.length);
     const page = pageEvents(events)[0]!;
     expect(page.position).toBe(1);
     expect(page.tool).toBe("add_slide");
@@ -250,6 +262,40 @@ describe("LIVE REALITY: add_slide output delta assembly", () => {
       { kind: "page", position: 1, html: "<html>only</html>", tool: "add_slide", title: "BANANA" },
     ]);
     expect(parser.flush()).toEqual([]);
+  });
+});
+
+describe("page_progress (in-page streaming)", () => {
+  test("single-fragment page emits NO progress — one event stays one page event", () => {
+    const parser = new SseParser();
+    const events = feed(parser, addSlideFragmentLine([1], "<html>whole</html>"));
+    expect(events.map((e) => e.kind)).toEqual(["page"]);
+  });
+
+  test("progress carries accumulated html from the 2nd fragment; final page emitted exactly once", () => {
+    const parser = new SseParser();
+    const store = new PageStore();
+    const events = feed(
+      parser,
+      [
+        addSlideFragmentLine([1], "<div>a</div>"),
+        addSlideFragmentLine([1], "<div>b</div>"),
+        addSlideFragmentLine([1], "<div>c</div>"),
+      ].join("\n"),
+    );
+    const progress = events.filter(
+      (e): e is Extract<SseEvent, { kind: "page_progress" }> => e.kind === "page_progress",
+    );
+    expect(progress.map((p) => p.html)).toEqual([
+      "<div>a</div><div>b</div>",
+      "<div>a</div><div>b</div><div>c</div>",
+    ]);
+    expect(progress.every((p) => p.bytes === p.html.length)).toBe(true);
+    const pages = pageEvents(events);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]!.html).toBe("<div>a</div><div>b</div><div>c</div>");
+    for (const ev of events) store.applyEvent(ev);
+    expect(store.size).toBe(1);
   });
 });
 
@@ -568,6 +614,12 @@ describe("live fixtures (api.z.ai probe 2026-08-31)", () => {
     expect(page.html.startsWith("<!DOCTYPE html>")).toBe(true);
     expect(page.html.trimEnd().endsWith("</html>")).toBe(true);
     expect(page.html).toContain("BANANA");
+    // Transport unescaping verification: real newlines, clean attribute quotes, zero literal escape sequences
+    expect(page.html).not.toContain("\\n");
+    expect(page.html).not.toContain('\\"');
+    expect(page.html).toContain('\n');
+    expect(page.html).toContain('lang="en"');
+    expect(page.html).toContain('charset="UTF-8"');
     expect(events.some((e) => e.kind === "stream_error")).toBe(false);
   });
 });

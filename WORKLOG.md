@@ -1,0 +1,35 @@
+- **2026-09-15 14:21** [general] --help
+- **2026-09-15 14:21** [explore] Explored Svelte frontend and worksheet contracts for ember-stone redesign
+- **2026-09-15 14:21** [git] Committed initial version and created boss-mode branch with inspiration images
+- **2026-09-22 13:40** [context] Hydrating context by exploring project structure and codebase
+- **2026-09-22 13:43** [context] Hydrated context: audited codebase, SSE parser, contracts, storage, UI, test suite (72/72 passing), and svelte-check (0 errors)
+- **2026-09-22 13:43** [audit] Auditing saved_slides to inspect recent generation artifacts and corrupted HTML
+- **2026-09-22 18:34** [fix] Audited live preview improvement: confirmed transport unescaping fixes in parser.ts, rescue.ts, placeholders.ts, and vite.config.ts
+- **2026-09-22 18:36** [audit] Investigating 3 issues: preview sizing & stage fitting, contract 2/3 definitions, and chain-of-thought single-line above preview
+- **2026-09-22 18:39** [audit] Auditing App.svelte preview header and stage fit status
+- **2026-09-22 18:42** [ui-feature] Completed preview responsive stage fitting, contracts v4 update, and top bar header cleanup
+- **2026-09-22 19:42** [assets] Inspecting /home/hayron/Zlides22/ZSLIDES22.png image dimensions and bounding box
+- **2026-09-22 20:34** [assets] Cropped ZSLIDES22.png into logo_hero.webp, created LogoHeroHeader and LogoHeroSplash components with black blending
+- **2026-09-22 20:35** [styling] Verified 3-layer CSS sandwich architecture in LogoHeroHeader and LogoHeroSplash
+- **2026-09-22 20:36** [styling] Refactoring LogoHeroHeader and LogoHeroSplash to borderless background integration with seamless edge blending
+- **2026-09-22 20:36** [styling] Removed capsule boxes and version badge, blending logo directly into dark background with CSS gradient masks
+- **2026-09-22 20:37** [layout] Moving API Key and Vault controls to top bar, removing artificial glow box from LogoHeroHeader
+- **2026-09-22 20:38** [layout] Relocated API Key and Vault buttons to the Preview Top Bar and polished LogoHeroHeader
+- **2026-09-22 20:38** [cleanup] Removing bottom helper strip from LogoHeroSplash and ensuring Past Classes is prominent in top bar
+- **2026-09-22 20:39** [UI/Brand] Cleaned up unused props in LogoHeroSplash invocation and verified zero build errors/warnings
+- **2026-09-22 20:42** [UI/Brand] Stripped splash screen down to only the logo and Precision Educational Architecture header
+- **2026-09-22 20:44** [Brand/Assets] Processed logo-clean-final.png into brand assets and wired into preview splash screen
+- **2026-09-22 20:45** [UI/Brand] Expanded sidebar hero logo height/contrast and unlocked 100% splash stage canvas fitting
+- **2026-09-22 20:59** [UI/Architecture] Implemented animated SVG MorphDropdown and ContractsMorphPopover across Top Bar and replaced destructive sidebar box
+- **2026-09-22 21:01** [UI/Architecture] Consolidated Top Bar actions into SVG MorphDropdown with exact 400ms cubic-bezier transitions
+- **2026-09-22 21:06** [UI/CSS] Fixed SVG dropdown alignment with dynamic pathLength scaling and relaxed 600ms easing
+- **2026-09-22 21:08** [UI/CSS] Implemented authentic dual-path outline emergence animation and button styling in MorphDropdown
+- **2026-09-22 21:11** [UI/CSS] Implemented notch peak arrow, circular action button, and 2px dual-path perimeter stroke morphing in MorphDropdown
+- **2026-09-22 21:12** [UI/CleanUp] Removed redundant Preview text, switched stepper to Inter font, locked row heights to 50px, and upgraded outline to 2.5px
+- **2026-09-22 21:13** [ui] Reordered Top Bar dropdowns: Preview view sizing dropdown first on the far left with label='Preview' followed by Document Archetype dropdown, preserving 2.5px dual-path SVG morphing animation and zero-artifact rendering
+- **2026-09-22 21:14** [ui] Reordered Top Bar dropdowns: Preview view sizing dropdown first on the far left followed by Document Archetype dropdown with 2.5px dual-path SVG morphing animation and zero-artifact rendering
+- **2026-09-22 21:18** [ui] Fixed chevron-notch alignment via dynamic DOM offset calculation, eliminated persistent SVG artifacts with lifecycle unmounting and transparent stroke baselines, and smoothed Vault modal/stage transitions with fade/scale/morph easing
+- **2026-09-22 21:23** [ui] Fixed dropdown click reliability by isolating event propagation and checking composedPath on outside dismiss, and redesigned chevron to bold high-contrast stroke vector
+- **2026-09-22 21:24** [ui] Matched SVG perimeter stroke thickness (2.5px) and amber color (#f0b23e) identically to trigger button border and final box, with reference-matched downward triangle arrow
+- **2026-09-22 21:24** [ui] Balanced arrows across UI: replaced oversized unicode page stepper arrows and tiny dropdown glyphs with crisp, unified 13px stroke chevrons
+- **2026-09-22 21:25** [ui] Removed circular wrapper from dropdown trigger and switched to clean, naked 14px stroke-based dropdown chevron with smooth active rotation

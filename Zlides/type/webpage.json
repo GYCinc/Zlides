@@ -1,6 +1,6 @@
 {
   "id": "HTML Project",
   "name": "HTML Project",
-  "description": "Responsive standalone HTML webpage or SPA",
-  "prompt": "TARGET FORMAT: SEMANTIC HTML5 + Vanilla JS + CSS"
+  "description": "Continuous vertical visual document — single-scroll HTML report (archetype trigger contract, zone TOP)",
+  "prompt": "Format: Continuous vertical visual document (HTML single-scroll report).\nLayout Engine: Responsive auto-height container. No slides, no fixed viewports, no pagination.\nNative mode cue: 长图 / long image — extended vertical scroll with content-adaptive section heights.\nOutput contract: one self-contained standalone HTML document (inline CSS/JS) — return only the HTML."
 }

@@ -7,8 +7,10 @@ declare module "bun:test" {
     toHaveLength(length: number): void;
     toContain(expected: string): void;
     toBeGreaterThan(expected: number): void;
+    toBeLessThan(expected: number): void;
     not: {
       toBe(expected: unknown): void;
+      toContain(expected: string): void;
     };
   };
 }

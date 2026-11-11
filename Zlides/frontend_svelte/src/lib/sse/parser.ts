@@ -13,9 +13,12 @@
  *   (distinguishes noise from protocol drift) and the counter resets.
  */
 
+import { decodeHtmlPayload } from "./rescue.js";
+
 export type SseEvent =
   | { kind: "thinking"; text: string }
   | { kind: "page"; position: number | null; html: string; tool: string; title: string | null }
+  | { kind: "page_progress"; position: number | null; html: string; tool: string; title: string | null; bytes: number }
   | { kind: "tool_misc"; tool: string; summary: string }
   | { kind: "answer"; text: string }
   | { kind: "stream_error"; code: string | null; message: string }
@@ -161,6 +164,7 @@ export class SseParser {
   private accPosition: number | null = null;
   private accTitle: string | null = null;
   private accHtml = "";
+  private accFragments = 0;
   readonly warnings: string[] = [];
 
   /** Live-verified: tool intent fragments (input-only tool events) are progressive
@@ -182,6 +186,11 @@ export class SseParser {
    * key changes, the phase leaves `tool`, `[DONE]` arrives — or when you
    * call `flush()` after the stream closes. ALWAYS call `flush()` at end of
    * stream: the live stream has no [DONE]/usage terminator.
+   *
+   * In-page streaming: from the 2nd fragment of an assembly onward, each
+   * append ALSO emits a `page_progress` event carrying the accumulated HTML
+   * so far. Preview-only — the assembled `page` event remains the ONLY
+   * PageStore input; single-shot full-page tools never emit progress.
    */
   push(dataStr: string): SseEvent[] {
     const line = dataStr.trim();
@@ -343,7 +352,7 @@ export class SseParser {
 
   private flushPage(): SseEvent[] {
     if (this.accKey === null) return [];
-    const html = this.accHtml;
+    const html = decodeHtmlPayload(this.accHtml);
     const tool = this.accTool;
     const position = this.accPosition;
     const title = this.accTitle;
@@ -351,6 +360,7 @@ export class SseParser {
     this.accHtml = "";
     this.accPosition = null;
     this.accTitle = null;
+    this.accFragments = 0;
     if (html.trim().length === 0) {
       this.warnings.push(`sse: ${tool} page with empty output — no page emitted`);
       return [];
@@ -401,6 +411,18 @@ export class SseParser {
         if (this.accPosition === null) this.accPosition = position;
         if (this.accTitle === null) this.accTitle = title;
         this.accHtml += output;
+        this.accFragments += 1;
+        if (this.accFragments >= 2) {
+          const decodedProgress = decodeHtmlPayload(this.accHtml);
+          events.push({
+            kind: "page_progress",
+            position: this.accPosition,
+            html: decodedProgress,
+            tool: this.accTool,
+            title: this.accTitle,
+            bytes: decodedProgress.length,
+          });
+        }
       } else {
         this.suppressedToolIntentFragments += 1;
       }

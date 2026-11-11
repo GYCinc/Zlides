@@ -27,7 +27,7 @@ Zlides operates entirely as a high-performance **client-side GUI** communicating
 - **Direct SSE Stream Processing:** The browser streams Server-Sent Events straight from the API, live-rendering thinking in the Reasoning drawer and tool outputs into the preview `<iframe>`.
 - **In-Memory File Ingestion:** Attached source files are read directly in the client via `file.text()` — no backend upload endpoints.
 - **Client-Side Worksheet Vault:** Generated worksheets are saved into browser storage with instant search, reload, and one-click `.html` download.
-- **Port 2828:** Served on port 2828 via `./launch.sh`.
+- **Port 2727:** Served on port 2727 via `./launch.sh`.
 
 ---
 
@@ -66,9 +66,9 @@ $$\mathbf{Format} \longrightarrow \mathbf{Structure} \longrightarrow \mathbf{Con
 
 ---
 
-## 5. Launch — Port 2828
+## 5. Launch — Port 2727
 
-- Launched via `./launch.sh` on **port 2828**.
+- Launched via `./launch.sh` on **port 2727**.
 - Cleans up stale processes, injects API keys from `.secrets.env`, and opens browser automatically.
 
 ---

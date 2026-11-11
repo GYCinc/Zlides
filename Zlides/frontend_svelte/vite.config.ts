@@ -3,6 +3,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { createHash } from 'crypto';
+import { loadLacSkill } from './src/contracts/lacSkill';
 
 export default defineConfig(() => {
   let apiKey = process.env.Z_AI_API_KEY || process.env.ZAI_API_KEY || '';
@@ -91,8 +94,33 @@ export default defineConfig(() => {
           req.on('data', (chunk: any) => (body += chunk));
           req.on('end', () => {
             try {
-              let { html, title } = JSON.parse(body);
+              const data = JSON.parse(body || '{}');
+              let html = data.html || '';
+              const title = data.title || '';
+              const decodeHtmlPayload = (raw: string): string => {
+                if (!raw || !raw.includes('\\')) return raw;
+                return raw.replace(/\\(?:(["\\\/bfnrt])|u([0-9a-fA-F]{4}))/g, (match, p1, p2) => {
+                  if (p1) {
+                    switch (p1) {
+                      case '"': return '"';
+                      case '\\': return '\\';
+                      case '/': return '/';
+                      case 'b': return '\b';
+                      case 'f': return '\f';
+                      case 'n': return '\n';
+                      case 'r': return '\r';
+                      case 't': return '\t';
+                      default: return match;
+                    }
+                  }
+                  if (p2) {
+                    return String.fromCharCode(parseInt(p2, 16));
+                  }
+                  return match;
+                });
+              };
               const normalizeForSave = (raw: string): string => {
+                const unescaped = decodeHtmlPayload(raw);
                 const SEP = "<!-- zlides:page-break -->";
                 const extractBody = (h: string) => {
                   const m = h.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -103,7 +131,7 @@ export default defineConfig(() => {
                   return m ? m[1].trim() : '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">';
                 };
                 const assemble = (pages: string[]): string => {
-                  if (pages.length === 0) return raw;
+                  if (pages.length === 0) return unescaped;
                   const first = pages[0];
                   let headInner = extractHead(first);
                   const fix = `\n<style>\nhtml,body{background:#0f1112 !important;margin:0;padding:0;}\nbody{overflow:auto !important;height:auto !important;min-height:100vh;color:#e5e7eb;}\n.slide{width:100% !important;max-width:1280px !important;margin:0 auto !important;height:auto !important;min-height:0 !important;max-width:100%;}\n</style>`;
@@ -111,18 +139,18 @@ export default defineConfig(() => {
                   const bodies = pages.map(extractBody).join('\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
                   return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n<body style="background:#0f1112;color:#e5e7eb;margin:0;padding:24px;max-width:100%;overflow:auto;">\n${bodies}\n</body>\n</html>`;
                 };
-                if (raw.includes(SEP)) {
-                  const parts = raw.split(SEP).map((s: string) => s.trim()).filter(Boolean);
+                if (unescaped.includes(SEP)) {
+                  const parts = unescaped.split(SEP).map((s: string) => s.trim()).filter(Boolean);
                   return assemble(parts);
                 }
-                const dc = (raw.match(/<!DOCTYPE/gi) || []).length;
+                const dc = (unescaped.match(/<!DOCTYPE/gi) || []).length;
                 if (dc > 1) {
-                  const parts = raw.split(/(?=<!DOCTYPE)/gi).map((s: string) => s.trim()).filter(Boolean);
+                  const parts = unescaped.split(/(?=<!DOCTYPE)/gi).map((s: string) => s.trim()).filter(Boolean);
                   if (parts.length > 1) return assemble(parts);
                 }
-                return raw;
+                return unescaped;
               };
-              html = normalizeForSave(html);
+              html = decodeHtmlPayload(normalizeForSave(html));
               const savedDir = path.resolve(__dirname, '../saved_slides');
               if (!fs.existsSync(savedDir)) fs.mkdirSync(savedDir, { recursive: true });
 
@@ -143,6 +171,153 @@ export default defineConfig(() => {
           return;
         }
 
+        // GET /api/vig/transcript?video=<id> -> real YouTube transcript with cue timings
+        if (url.pathname === '/api/vig/transcript' && req.method === 'GET') {
+          const sendJson = (status: number, payload: any) => {
+            res.statusCode = status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(payload));
+          };
+
+          const videoId = url.searchParams.get('video') || '';
+          if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+            sendJson(400, { error: 'invalid video id' });
+            return;
+          }
+
+          const cacheDir = path.resolve(__dirname, '../.vig-cache');
+          const cachePath = path.resolve(__dirname, '../.vig-cache', videoId + '.json');
+
+          const serveCache = () => {
+            try {
+              const raw = fs.readFileSync(cachePath, 'utf8');
+              JSON.parse(raw);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(raw);
+            } catch (e: any) {
+              sendJson(502, { error: String(e && e.message ? e.message : e), stderr: '' });
+            }
+          };
+
+          if (fs.existsSync(cachePath)) {
+            serveCache();
+            return;
+          }
+
+          try {
+            fs.mkdirSync(cacheDir, { recursive: true });
+          } catch (e: any) {
+            sendJson(502, { error: String(e && e.message ? e.message : e), stderr: '' });
+            return;
+          }
+
+          const fetcherPath = path.resolve(__dirname, 'vig/fetch-transcript.py');
+          const args = [
+            'run',
+            '--isolated',
+            '--with',
+            'youtube-transcript-api',
+            fetcherPath,
+            '--video',
+            videoId,
+            '--out',
+            cachePath,
+          ];
+          const runUv = (bin: string) =>
+            new Promise<void>((resolve, reject) => {
+              execFile(
+                bin,
+                args,
+                { timeout: 180000, maxBuffer: 1024 * 1024 * 20 },
+                (err: any, _stdout: any, stderr: any) => {
+                  if (err) {
+                    err.stderr = stderr;
+                    reject(err);
+                    return;
+                  }
+                  resolve();
+                }
+              );
+            });
+
+          try {
+            try {
+              await runUv('uv');
+            } catch (e: any) {
+              if (e && e.code === 'ENOENT') {
+                await runUv('/home/hayron/.local/bin/uv');
+              } else {
+                throw e;
+              }
+            }
+          } catch (e: any) {
+            sendJson(502, {
+              error: String(e && e.message ? e.message : e).slice(0, 2000),
+              stderr: String(e && e.stderr ? e.stderr : '').trim().slice(0, 4096),
+            });
+            return;
+          }
+
+          serveCache();
+          return;
+        }
+
+        // GET /api/vig/contract -> the model contract fenced between the markers in the
+        // skill's SKILL.md. Read live on every request: the skill stays the single source
+        // of truth, so the app can never send a stale copy of the rules.
+        if (url.pathname === '/api/vig/contract' && req.method === 'GET') {
+          const skillDir = process.env.VIG_SKILL_DIR || '/home/hayron/By Student/.opencode/commands/vig-generator';
+          const skillPath = path.resolve(skillDir, 'SKILL.md');
+          try {
+            const raw = fs.readFileSync(skillPath, 'utf8');
+            const marked = raw.match(/<!-- VIG-MODEL-CONTRACT:START -->([\s\S]*?)<!-- VIG-MODEL-CONTRACT:END -->/);
+            if (!marked) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'contract markers missing in SKILL.md' }));
+              return;
+            }
+            const contract = marked[1].replace(/<!--[\s\S]*?-->/g, '').trim();
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              contract,
+              chars: contract.length,
+              sha256: createHash('sha256').update(contract).digest('hex'),
+              source: skillPath,
+            }));
+            return;
+          } catch (e: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: String(e && e.message ? e.message : e) }));
+            return;
+          }
+        }
+
+        // GET /api/lac/contract -> the LAC worksheet skill, read live on every request:
+        // the rules the model sees, plus the chassis (styles, font links, engine) the app owns.
+        if (url.pathname === '/api/lac/contract' && req.method === 'GET') {
+          try {
+            const skill = loadLacSkill();
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              contract: skill.contract,
+              chars: skill.contract.length,
+              sha256: skill.sha256,
+              source: skill.source,
+              styles: skill.styles,
+              links: skill.links,
+              engine: skill.engine,
+            }));
+            return;
+          } catch (e: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: String(e && e.message ? e.message : e) }));
+            return;
+          }
+        }
+
         next();
       });
     },
@@ -154,12 +329,14 @@ export default defineConfig(() => {
       'import.meta.env.VITE_DEFAULT_API_KEY': JSON.stringify(apiKey),
     },
     server: {
-      port: 2828,
+      port: 2727,
       host: '0.0.0.0',
+      strictPort: true,
     },
     preview: {
-      port: 2828,
+      port: 2727,
       host: '0.0.0.0',
+      strictPort: true,
     },
     build: {
       outDir: '../public',

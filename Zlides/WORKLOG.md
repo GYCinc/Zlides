@@ -1,0 +1,8 @@
+- **2026-09-17 23:02** [act-1] Final round opened: three-zone payload law adopted from owner directive; audit found continuous-vertical archetype missing from every preset
+- **2026-09-17 23:02** [act-2] Decoded slides_glm_agent via four reverse-engineered tomes: no format parameter exists, prompt-cue-only formats, prompt-timing law, 15-page limit
+- **2026-09-17 23:02** [act-3] Streaming HTML shipped: wire carries page HTML as add_slide output delta fragments; new page_progress event surfaces accumulated HTML, preview-painted at 200ms throttle
+- **2026-09-17 23:02** [act-4] Branding forged: wordmark checkerboard exorcised in three passes (border flood fill 49.9pct, tight chroma key, pocket sweep 5185 cells), sand wisps preserved per owner decree; carved-Z favicon minted via minimum-ink split
+- **2026-09-17 23:02** [act-4] Port exodus completed: 2727 sovereign, 2828 ceded to competitor who immediately threw three 400s at their own api/slides/generate route
+- **2026-09-17 23:02** [act-5] Corrupted heirloom healed: slide_20260918043526 Spices worksheet was JSON-string-encoded saved as raw HTML (1356 literal escape sequences) from answer-phase rescue accepting encoded artifact transport
+- **2026-09-17 23:02** [act-6] Final ledger closed: 11 files modified, 15 created; tests 64 to 72 all green; svelte-check 14 errors to 0; collapsible-trigger class-swallowing bug fixed; bun-test shim extended; tsconfig lib paths mapped; long-form chronicle at specs/20260917T2259-final-round-log.md
+- **2026-09-17 23:05** [act-7] Design-taste pass (anti-slop skill): em-dash ban enforced across all owner-visible strings, 27 rewrites in App.svelte and index.html

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Zlides Launcher (Pure Client-Side SSE Architecture)
-PORT=2828
+PORT=2727
 
 clear
 echo "Starting Zlides GUI..."
@@ -32,9 +32,9 @@ if [ -n "$pids" ]; then
     sleep 1
 fi
 
-vite_pids=$(lsof -ti:2828 2>/dev/null || true)
+vite_pids=$(lsof -ti:2727 2>/dev/null || true)
 if [ -n "$vite_pids" ]; then
-    echo "  Killing vite on port 2828: $vite_pids"
+    echo "  Killing vite on port 2727: $vite_pids"
     echo "$vite_pids" | xargs kill -9 2>/dev/null || true
     sleep 1
 fi
@@ -57,7 +57,7 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
-# ── Start Vite GUI on port 2828 ────────────────────────────────────────────
+# ── Start Vite GUI on port 2727 ────────────────────────────────────────────
 echo "Starting Zlides Vite GUI on port $PORT..."
 cd frontend_svelte
 export PATH="$HOME/.bun/bin:$PATH"
