@@ -13,7 +13,6 @@
   import LogoHeroHeader from './lib/components/brand/LogoHeroHeader.svelte';
   import LogoHeroSplash from './lib/components/brand/LogoHeroSplash.svelte';
   import MorphDropdown from './lib/components/ui/MorphDropdown.svelte';
-  import ContractsMorphPopover from './lib/components/ui/ContractsMorphPopover.svelte';
   import docTypeJson from '../../type/document.json';
   import slidesTypeJson from '../../type/slides.json';
   import webpageTypeJson from '../../type/webpage.json';
@@ -548,7 +547,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
 `;
 
   // Contract version: bump to v4 for full format & style refresh
-  const CONTRACT_VERSION = 'v5';
+  const CONTRACT_VERSION = 'v6';
   const CONTRACT_VERSION_KEY = 'zlides_contract_version';
   const space = (key: string, fallback: string) => {
     if (typeof localStorage === 'undefined') return fallback;
@@ -565,7 +564,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
   };
   const initialTypeText = space('type', DEFAULT_TYPE_PROMPT);
   let typeSpace = $state(initialTypeText);
-  let formatSpace = $state(space('format', DEFAULT_FORMAT_PROMPT));
+  let formatSpace = $state(space('format', ''));
   let styleSpace = $state(space('style', DEFAULT_STYLE_TOKENS));
   let isContractsOpen = $state(false);
   let previewMode = $state<'document' | 'slides' | 'webpage'>(
@@ -600,7 +599,9 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
   );
 
   const formatChoice = $derived(
-    formatSpace.trim() === DEFAULT_FORMAT_PROMPT.trim() ? 'worksheet' : 'custom'
+    formatSpace.trim() === '' ? 'none'
+      : formatSpace.trim() === DEFAULT_FORMAT_PROMPT.trim() ? 'worksheet'
+        : 'custom'
   );
 
   function setStyleChoice(id: string) {
@@ -2220,19 +2221,20 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           buttonClass="px-2 py-1"
           onselect={(opt) => applyLayoutType(opt.id as 'document' | 'slides' | 'webpage')}
           options={[
-            { id: 'document', label: 'A4 Document', sublabel: '210 × 297 mm print', accentColor: '#f0b23e' },
-            { id: 'slides', label: '16:9 Slides', sublabel: '1280 × 720 canvas', accentColor: '#4fb3a9' },
-            { id: 'webpage', label: 'Fluid Webpage', sublabel: 'Single-scroll report', accentColor: '#ffffff' }
+            { id: 'document', label: 'A4 Document', accentColor: '#f0b23e' },
+            { id: 'slides', label: '16:9 Slides', accentColor: '#4fb3a9' },
+            { id: 'webpage', label: 'Fluid Webpage', accentColor: '#ffffff' }
           ]}
         />
         <MorphDropdown
           value={formatChoice}
-          label={`Format: ${formatChoice === 'worksheet' ? 'Practice' : 'Custom'}`}
+          label={`Format: ${formatChoice === 'none' ? 'None' : formatChoice === 'worksheet' ? worksheetFormatJson.name : 'Custom'}`}
           width={210}
           buttonClass="px-2 py-1"
           onselect={() => { formatSpace = DEFAULT_FORMAT_PROMPT; }}
           options={[
-            { id: 'worksheet', label: 'Practice Blueprint', sublabel: 'Modular categories, exercise cards, in-box regeneration', accentColor: '#f0b23e' }
+            { id: 'worksheet', label: worksheetFormatJson.name, accentColor: '#f0b23e' },
+            { id: 'none', label: 'None', accentColor: '#9ca3af', onclick: () => { formatSpace = ''; } }
           ]}
         />
         <MorphDropdown
@@ -2242,31 +2244,45 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           buttonClass="px-2 py-1"
           onselect={(opt) => setStyleChoice(opt.id)}
           options={[
-            { id: 'gitenglish', label: 'gitEnglish', sublabel: 'Your design system — Palette A tokens', accentColor: '#ff6b35' },
-            { id: 'design-md', label: 'DESIGN.md', sublabel: 'Stitch-spec design contract', accentColor: '#4fb3a9' },
-            { id: 'auto', label: 'Auto (None)', sublabel: 'Agent designs itself', accentColor: '#9ca3af' },
-            { id: 'custom', label: 'Custom', sublabel: 'Edited in Contracts', accentColor: '#ffffff' }
-          ]}
-        />
-        <MorphDropdown
-          label={activeSkills.length > 0 ? `Skills · ${activeSkills.length} active` : 'Skills'}
-          width={210}
-          buttonClass="px-2 py-1"
-          options={[
-            ...savedSkills.map((sk) => ({
-              id: sk.id,
-              label: sk.name,
-              sublabel: sk.active ? 'Active — injected into the next run' : 'Off — click to activate',
-              accentColor: sk.active ? '#4fb3a9' : '#6b7280',
-              onclick: () => toggleSkillActive(sk.id)
-            })),
-            { id: 'edit-skills', label: 'Edit skills…', sublabel: 'Open the library', accentColor: '#ffffff', onclick: () => openSkillsModal('library') }
+            { id: 'gitenglish', label: 'gitEnglish', accentColor: '#ff6b35' },
+            { id: 'design-md', label: 'DESIGN.md', accentColor: '#4fb3a9' },
+            { id: 'auto', label: 'Auto (None)', accentColor: '#9ca3af' },
+            { id: 'custom', label: 'Custom', accentColor: '#ffffff' }
           ]}
         />
       </div>
     </div>
 
-    <!-- Chat History & Large High-Contrast Reasoning Stream -->
+    <!-- Engine tabs (owner's original strip) + Skills -->
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="grid grid-cols-2 gap-1 p-1 bg-ge-bg border border-ge-border rounded-xl" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={appMode === 'sheet'}
+          onclick={() => { appMode = 'sheet'; }}
+          title="Worksheet Engine"
+          class="py-1.5 px-1 rounded-lg text-sm font-semibold transition-colors cursor-pointer truncate {appMode === 'sheet' ? 'bg-ge-card text-white border border-ge-border-strong' : 'text-neutral-300 hover:text-white'}"
+        >Worksheet</button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={appMode === 'vig'}
+          onclick={() => { appMode = 'vig'; }}
+          title="Video Immersion Guide"
+          class="py-1.5 px-1 rounded-lg text-sm font-semibold transition-colors cursor-pointer truncate {appMode === 'vig' ? 'bg-ge-card text-white border border-ge-border-strong' : 'text-neutral-300 hover:text-white'}"
+        >Video Guide</button>
+      </div>
+      <button
+        type="button"
+        class="ml-auto w-8 h-8 shrink-0 flex items-center justify-center bg-ge-bg border {activeSkills.length > 0 ? 'border-ge-accent/70' : 'border-ge-border'} rounded-lg text-white hover:border-ge-accent/50 transition-colors cursor-pointer"
+        onclick={() => openSkillsModal(appMode === 'lac' ? 'lac' : appMode === 'vig' ? 'vig' : 'library')}
+        title="Skills ({activeSkills.length} active of {savedSkills.length})"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-ge-accent"><path d="M13 2 4.5 13H11l-1 9 8.5-11H12l1-9z"/></svg>
+      </button>
+    </div>
+
     <div id="chat-history" class="flex-1 min-h-[140px] min-w-0 overflow-y-auto flex flex-col gap-4 p-4 bg-ge-bg rounded-xl border border-ge-border text-base leading-relaxed">
       {#each chatMessages as msg}
         {#if msg.role === 'user'}
@@ -2333,6 +2349,12 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
             Loading contract from the skill...
           {/if}
         </div>
+        <button
+          type="button"
+          onclick={() => generateVig()}
+          disabled={isGenerating || !vigLinkInput.trim()}
+          class="px-4 py-1.5 text-sm rounded-lg bg-ge-accent text-black font-extrabold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+        >{isGenerating ? 'Generating…' : 'Generate Guide'}</button>
       </div>
       {:else if appMode === 'lac'}
       <div class="flex flex-col gap-3 bg-ge-bg rounded-xl p-3 border border-ge-border max-h-[46vh] overflow-y-auto">
@@ -2390,6 +2412,12 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
             class="shrink-0 px-2.5 py-1 rounded-md border border-ge-border bg-ge-card hover:border-ge-accent text-white font-sans text-sm font-medium cursor-pointer"
           >View / Edit Skill</button>
         </div>
+        <button
+          type="button"
+          onclick={() => generateLac()}
+          disabled={isGenerating || !lac}
+          class="px-4 py-1.5 text-sm rounded-lg bg-ge-accent text-black font-extrabold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+        >{isGenerating ? 'Generating…' : 'Generate from LAC'}</button>
       </div>
       {:else}
       <div class="flex flex-col bg-ge-bg rounded-xl p-3 border border-ge-border">
@@ -2401,8 +2429,8 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           class="w-full bg-transparent border-none outline-none resize-y p-1 text-white placeholder:text-neutral-500 text-base min-h-[84px] font-inter leading-relaxed"
         ></textarea>
         <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-ge-border-soft">
-          <label class="cursor-pointer text-sm font-semibold flex items-center gap-1.5 bg-ge-card hover:bg-ge-card-elevated px-3 py-1.5 rounded-lg border border-ge-border text-white transition-colors">
-            Attach file
+          <label class="cursor-pointer w-8 h-8 shrink-0 flex items-center justify-center bg-ge-card hover:bg-ge-card-elevated rounded-lg border border-ge-border text-white transition-colors" title="Attach file">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             <input type="file" class="hidden" onchange={handleFileSelect} accept=".txt,.md,.json,.html,.csv" disabled={isUploading} />
           </label>
           <div class="flex items-center gap-2 min-w-0">
@@ -2413,8 +2441,21 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
               <button
                 type="button"
                 onclick={stopRequest}
-                class="px-3 py-1.5 text-sm rounded-lg bg-ge-danger text-white font-semibold hover:bg-ge-danger/90 cursor-pointer"
-              >Stop</button>
+                class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-ge-danger text-white hover:bg-ge-danger/90 cursor-pointer"
+                title="Stop"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              </button>
+            {:else}
+              <button
+                type="button"
+                onclick={() => generate()}
+                disabled={!promptText.trim() && !extractedMarkdown}
+                class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-ge-accent text-black hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={appMode === 'open' ? 'Send to Agent' : 'Generate'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
             {/if}
           </div>
         </div>
@@ -2442,26 +2483,11 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           Continue remaining pages{pageGapCount > 0 ? ` · ${pageGapCount} missing` : ''}
         </button>
       {/if}
+    </div>
 
-      <div class="flex items-center justify-end gap-2">
-        {#if appMode === 'open' && !isGenerating && (conversationId !== null || pages.length > 0)}
-          <button
-            type="button"
-            onclick={() => { clearConversation(); pages = []; selectedPageIndex = 0; status = 'New chat: context cleared'; }}
-            class="px-3 py-2 text-sm rounded-lg bg-ge-bg border border-ge-border text-white font-semibold hover:border-ge-accent/60 cursor-pointer"
-            title="Clear the conversation and the deck so the next send starts fresh"
-          >New chat</button>
-        {/if}
-        <button
-          onclick={appMode === 'vig' ? () => generateVig() : appMode === 'lac' ? () => generateLac() : () => generate()}
-          disabled={isGenerating || (appMode === 'vig' ? !vigLinkInput.trim() : appMode === 'lac' ? !lac : (!promptText.trim() && !extractedMarkdown))}
-          class="px-4 py-2 text-sm rounded-lg bg-ge-accent text-black font-extrabold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isGenerating
-            ? 'Generating…'
-            : appMode === 'vig' ? 'Generate Guide' : appMode === 'lac' ? 'Generate from LAC' : appMode === 'open' ? 'Send to Agent' : 'Generate Worksheet'}
-        </button>
-      </div>
+    <!-- Cost: out of the way, bottom of the sidebar -->
+    <div class="flex-shrink-0 text-[13px] font-mono text-neutral-500 text-right" title="Estimated cost">
+      ${formatUsd(cost)}{lastTokens !== null ? ` · ${lastTokens.toLocaleString()}t` : ''}
     </div>
 
     <!-- Resize handle -->
@@ -2483,36 +2509,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
   <div class="flex-grow bg-ge-bg relative flex flex-col min-w-0 overflow-hidden">
     <!-- Preview Top Bar: View mode, Stage fit, Centered Page Stepper, and Actions -->
     <div class="flex-shrink-0 h-12 border-b border-ge-border bg-ge-card flex items-center justify-between px-3 gap-2 relative z-20 overflow-visible">
-      <!-- Left: View Mode & Stage Fit controls with Animated Morph Dropdowns -->
-      <div class="flex items-center gap-2 shrink-0">
-        {#if appMode === 'sheet' || appMode === 'open'}
-        <!-- Preview / Stage View Size Morph Dropdown -->
-        <MorphDropdown
-          label="Preview"
-          bind:value={stageFitMode}
-          width={240}
-          options={[
-            { id: 'fill', label: 'Fill Stage (Full Screen)', sublabel: 'Dynamic responsive scaling', accentColor: '#4fb3a9' },
-            { id: 'fit-page', label: 'Fit Page View', sublabel: 'Preserve natural aspect ratio', accentColor: '#f0b23e' },
-            { id: '100%', label: '100% Scale', sublabel: 'Literal 1:1 pixel rendering', accentColor: '#ffffff' }
-          ]}
-        />
-
-        <!-- Mode / Archetype Morph Dropdown -->
-        <MorphDropdown
-          bind:value={previewMode}
-          width={230}
-          onselect={(opt) => applyLayoutType(opt.id as 'document' | 'slides' | 'webpage')}
-          options={[
-            { id: 'document', label: 'A4 Document', sublabel: 'Portrait 794×1123 print worksheet', accentColor: '#f0b23e' },
-            { id: 'slides', label: '16:9 Slides', sublabel: 'Widescreen 1280×720 canvas', accentColor: '#4fb3a9' },
-            { id: 'webpage', label: 'Fluid Webpage', sublabel: 'Responsive single-scroll report', accentColor: '#ffffff' }
-          ]}
-        />
-        {/if}
-      </div>
-
-      <!-- Center: Page Navigation Stepper & Live Streaming Indicator -->
+      <!-- Center: Live Streaming Indicator -->
       <div class="flex items-center gap-2">
         {#if status !== 'Ready' && !isGenerating}
           <span class="text-sm text-neutral-300 truncate max-w-[300px]" title={status}>{status}</span>
@@ -2523,41 +2520,20 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
             <span class="h-2 w-2 rounded-full bg-ge-accent animate-ping"></span>
             <span class="text-sm font-semibold text-ge-accent whitespace-nowrap">{livePageHtml !== null ? 'Streaming page…' : 'Agent is planning…'}</span>
           </div>
-        {:else}
-          <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded-lg p-0.5">
-            <button
-              class="px-2 py-1.5 rounded-md hover:bg-ge-card text-neutral-300 hover:text-white transition-colors disabled:opacity-25 disabled:hover:bg-transparent cursor-pointer flex items-center justify-center"
-              disabled={selectedPageIndex <= 0}
-              onclick={prevPage}
-              title="Previous page (Left arrow)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <span class="text-sm font-inter px-2.5 text-white font-semibold">
-              Page {selectedPage ? selectedPageIndex + 1 : 1} of {Math.max(1, pages.length)}
-            </span>
-            <button
-              class="px-2 py-1.5 rounded-md hover:bg-ge-card text-neutral-300 hover:text-white transition-colors disabled:opacity-25 disabled:hover:bg-transparent cursor-pointer flex items-center justify-center"
-              disabled={selectedPageIndex >= pages.length - 1}
-              onclick={nextPage}
-              title="Next page (Right arrow)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
         {/if}
         {/if}
       </div>
 
       <!-- Right: Consolidated Actions (Export Dropdown, Vault, API Key) -->
       <div class="flex items-center gap-2.5 shrink-0">
-        <span class="text-sm font-mono text-neutral-300 shrink-0" title="Estimated cost">
-          ${formatUsd(cost)}{lastTokens !== null ? ` · ${lastTokens.toLocaleString()}t` : ''}
-        </span>
+        {#if appMode === 'open' && !isGenerating && (conversationId !== null || pages.length > 0)}
+          <button
+            type="button"
+            onclick={() => { clearConversation(); pages = []; selectedPageIndex = 0; status = 'New chat: context cleared'; }}
+            class="text-sm px-3 py-1.5 bg-ge-bg border border-ge-border text-white font-medium hover:border-ge-accent/50 rounded-lg cursor-pointer"
+            title="Clear the conversation and the deck so the next send starts fresh"
+          >New chat</button>
+        {/if}
         <!-- Export & Document Actions Morph Dropdown -->
         <MorphDropdown
           label="Export"
@@ -2587,16 +2563,6 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
             }
           ]}
         />
-
-        <button
-          type="button"
-          class="text-sm px-3 py-1.5 bg-ge-bg border {activeSkills.length > 0 ? 'border-ge-accent/70 text-white' : 'border-ge-border text-white'} hover:border-ge-accent/50 rounded-lg font-medium hover:text-ge-accent transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-          onclick={() => openSkillsModal(appMode === 'lac' ? 'lac' : appMode === 'vig' ? 'vig' : 'library')}
-          title="View attached skills, save reusable skills, and toggle active skill injection"
-        >
-          <span class="h-2 w-2 rounded-full {activeSkills.length > 0 ? 'bg-ge-accent' : 'bg-neutral-500'}"></span>
-          <span>Skills <span class="font-mono text-neutral-300">({activeSkills.length}/{savedSkills.length})</span></span>
-        </button>
 
         <button
           type="button"
@@ -2672,6 +2638,26 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
                     : 'width: min(100%, 960px); height: 100%;')
         }
       >
+        {#if (appMode === 'sheet' || appMode === 'open') && pages.length > 0}
+          <button
+            type="button"
+            class="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-[#16181a]/85 border border-ge-border text-white hover:text-ge-accent hover:border-ge-accent/60 transition-colors cursor-pointer disabled:opacity-25 disabled:hover:text-white disabled:hover:border-ge-border"
+            disabled={selectedPageIndex <= 0}
+            onclick={prevPage}
+            title="Previous page"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <button
+            type="button"
+            class="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-[#16181a]/85 border border-ge-border text-white hover:text-ge-accent hover:border-ge-accent/60 transition-colors cursor-pointer disabled:opacity-25 disabled:hover:text-white disabled:hover:border-ge-border"
+            disabled={selectedPageIndex >= pages.length - 1}
+            onclick={nextPage}
+            title="Next page"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        {/if}
         {#if (appMode === 'sheet' || appMode === 'open') && pages.length === 0 && !isGenerating && !livePageHtml}
           <LogoHeroSplash />
         {:else}

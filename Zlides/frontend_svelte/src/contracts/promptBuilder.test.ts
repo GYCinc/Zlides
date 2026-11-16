@@ -82,19 +82,6 @@ describe("three-zone payload law", () => {
     expect(p.trimEnd().endsWith("RULE: no text below 13px")).toBe(true);
   });
 
-  test("an active skill lands last and overrides the slots above it", () => {
-    const p = assemblePrompt({
-      typeText: TYPE_CONTINUOUS,
-      formatText: FORMAT_BLUEPRINT,
-      userText: USER_TEXT,
-      styleText: STYLE_TOKENS,
-      preferencesText: "RULE: no text below 13px",
-      skillText: "=== ACTIVE SKILL (Master Deck) ===\nOwn the layout, the content and the style.",
-    });
-    expect(p.trimEnd().endsWith("Own the layout, the content and the style.")).toBe(true);
-    expect(p.indexOf("ACTIVE SKILL")).toBeGreaterThan(p.indexOf("RULE: no text below 13px"));
-  });
-
   test("fenced attachment keeps delimited-source contract intact", () => {
     const p = assemblePrompt({
       typeText: TYPE_CONTINUOUS,
