@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { CANONICAL_PLACEHOLDERS, ensurePlaceholders } from "./placeholders";
+import { CANONICAL_PLACEHOLDERS, ensurePlaceholders, assembleSingleDocument, splitSavedPages } from "./placeholders";
+import { cleanExportFilename } from "../../contracts/storage";
 
 function minimalDoc(inner = ""): string {
   return `<!DOCTYPE html><html><head><style>:root{--bg:#0f1112;--surface:#16181a;--line:#2e3236}</style></head><body><main>${inner}</main></body></html>`;
@@ -86,5 +87,26 @@ describe("placeholders", () => {
     const twice = ensurePlaceholders(once);
     const countTwice = (twice.match(/data-regenerate="true"/g) || []).length;
     expect(countTwice).toBe(countOnce);
+  });
+
+  test("assembleSingleDocument preserves all pages and splitSavedPages restores exact page count", () => {
+    const p1 = `<!DOCTYPE html><html><head><title>Dramatically Better Conversations</title><style>:root{--bg:#0f1112}</style></head><body><div class="page">Page One Intro</div></body></html>`;
+    const p2 = `<!DOCTYPE html><html><head><title>Seg 1</title></head><body><div class="page">Page Two Content</div></body></html>`;
+    const p3 = `<!DOCTYPE html><html><head><title>Seg 2</title></head><body><div class="page">Page Three Content</div></body></html>`;
+    const assembled = assembleSingleDocument([p1, p2, p3]);
+    expect(assembled).toContain("Page One Intro");
+    expect(assembled).toContain("Page Two Content");
+    expect(assembled).toContain("Page Three Content");
+    const restored = splitSavedPages(assembled);
+    expect(restored.length).toBe(3);
+    expect(restored[0]).toContain("Page One Intro");
+    expect(restored[1]).toContain("Page Two Content");
+    expect(restored[2]).toContain("Page Three Content");
+  });
+
+  test("cleanExportFilename produces human readable title slug without epoch noise", () => {
+    const html = `<!DOCTYPE html><html><head><title>Video Immersion Guide: The Science Behind Dramatically Better Conversations</title></head><body></body></html>`;
+    const name = cleanExportFilename("", html, "Worksheet");
+    expect(name).toBe("Video-Immersion-Guide-The-Science-Behind-Dramatically-Better-Conversations.html");
   });
 });

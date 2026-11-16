@@ -10,6 +10,9 @@
  * scripts/lac_worksheet_engine.py. Keep the two in step.
  */
 
+import { repairJson } from './jsonRepair';
+export { repairJson };
+
 export interface LacVocabulary { item: string; pos?: string; core_definition?: string }
 export interface LacPhrasal { item: string; latinateSynonym?: string; definition?: string }
 export interface LacCollocation { item: string; details?: string[] }
@@ -113,7 +116,9 @@ export function buildPlacementPlan(lac: Lac, seed = 0): { slots: PlanSlot[]; unc
 
   ordered.forEach((module, index) => {
     const chapter = Math.floor(index / 2) + 1;
-    for (let slot = 1; slot <= 2; slot++) {
+    // Four items per module: two per round, which is what the modules are built for.
+    // Two items left every exercise half empty.
+    for (let slot = 1; slot <= 4; slot++) {
       const unplaced = pool.map((_, i) => i).filter((i) => (used.get(i) ?? 0) === 0);
       const preferred = unplaced.filter((i) => module.bestFor.includes(pool[i].kind));
       const fallback = pool.map((_, i) => i).filter((i) => module.bestFor.includes(pool[i].kind));
@@ -147,6 +152,7 @@ export function formatPlanForPrompt(slots: PlanSlot[], lac: Lac): string {
     ...lines,
     '',
     `Chapter grouping: 1A+1B = chapter 1, 2A+2B = chapter 2, 3A+3B = chapter 3, 4A+4B = chapter 4.`,
+    `Each module gets four items: two in round 1 and two in round 2. An item may appear in more than one module — that is deliberate repetition across different exercise types.`,
     `Deliberately excluded from the worksheet (do not include): ${excluded.join(', ')}.`,
   ].join('\n');
 }
@@ -169,8 +175,6 @@ export function hashSeed(text: string): number {
   for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
   return h % 1000003;
 }
-
-export const LAC_SOURCE_MAX_CHARS = 40000;
 
 /** Rules from the lac-pipeline skill, expressed as a contract for the extractor. */
 export function lacExtractionContract(student: string, date: string): string {
@@ -332,15 +336,52 @@ export function validateLacDocument(html: string): LacDocumentCheck {
   const configs = (html.match(/class="atomic-config"/g) || []).length;
   const widgets = [...html.matchAll(/"widget"\s*:\s*"([a-z-]+)"/g)].map((m) => m[1]);
   const errors: string[] = [];
-  if (mounts !== 8) errors.push(`expected 8 atomic-mount blocks, found ${mounts}`);
-  if (configs !== 8) errors.push(`expected 8 atomic-config scripts, found ${configs}`);
-  if (widgets.length && new Set(widgets).size !== widgets.length) errors.push('two modules share the same widget');
+  if (mounts < 1) errors.push('no atomic-mount blocks found');
+  if (configs < 1) errors.push('no atomic-config scripts found');
   if (!html.includes('chapter-module')) errors.push('no chapter-module chrome found');
   if (/material-icons|fonts\.googleapis\.com\/icon/.test(html)) errors.push('external icon font requested');
   return { mounts, configs, widgets, errors };
 }
 
 export const LAC_THEMES = ['theme-ocean', 'theme-teal', 'theme-coral', 'theme-amber'];
+
+/** The prompt a chapter's refresh control carries. The website's script reads
+ *  data-prompt and asks GenAI for a new round; the page needs no app. */
+export function buildChapterRefreshPrompt(build: LacBuild, chapterIndex: number): string {
+  const chapter = build.chapters[chapterIndex];
+  const modules = build.modules.slice(chapterIndex * 2, chapterIndex * 2 + 2);
+  const widgets = modules.map((m) => m.widget).filter(Boolean);
+  const targets = modules.flatMap((m) => {
+    const rounds = (m as { rounds?: unknown }).rounds;
+    if (!Array.isArray(rounds)) return [] as string[];
+    const out: string[] = [];
+    for (const round of rounds) {
+      if (Array.isArray(round)) {
+        for (const item of round) {
+          const t = (item as { target?: unknown } | null)?.target;
+          if (typeof t === 'string' && t.trim()) out.push(t.trim());
+        }
+      } else if (round && typeof round === 'object') {
+        const words = (round as { words?: unknown }).words;
+        if (Array.isArray(words)) for (const w of words) if (typeof w === 'string' && w.trim()) out.push(w.trim());
+      }
+    }
+    return out;
+  });
+  const uniqueTargets = [...new Set(targets)];
+  return [
+    `Replace the refreshable content of chapter ${chapterIndex + 1} ("${chapter?.title ?? 'this chapter'}") in the worksheet "${build.title}".`,
+    `Return exactly ${modules.length} atomic mount blocks, in this order: ${widgets.join(', ')}.`,
+    'Each block must be this literal shape, with the JSON config inline:',
+    '<div class="atomic-mount"><script type="application/json" class="atomic-config">{"id":"...","widget":"...","rounds":[...]}</script></div>',
+    'Each JSON config must keep the same widget and the same keys and nesting as the block it replaces. Change only the wording: sentences, options, answers and explanations.',
+    `Keep the same target language: ${uniqueTargets.join(', ') || 'the chapter targets'}.`,
+    'Every sentence must be about the lesson topic. Every distractor must be a plausible alternative, same part of speech and register.',
+    'Do not reuse any wording from the current round.',
+    'Return those mount blocks only. No prose, no markdown fences, no document wrapper, no CSS, no other markup.',
+  ].join('\n');
+}
+
 
 export interface LacBuildChapter { kicker: string; title: string; sub: string }
 export interface LacBuildModule { id: string; tag?: string; widget: string; rounds?: unknown; buckets?: unknown; [k: string]: unknown }
@@ -368,6 +409,8 @@ Return ONLY this JSON object. No HTML, no CSS, no JavaScript, no markdown fences
 - Each module's own fields must match its entry in WIDGET CONFIG SHAPES exactly: same keys, same nesting (rounds as arrays-of-items or objects, whichever that widget uses), same value types. No extra keys.
 - Do not write markup, classes, or styles. The document, the chassis and the engine are assembled by the caller.
 - No external assets, no icon fonts.
+- Every option must be a real alternative a learner might actually choose. Never make the answer obvious by pairing it with something unrelated (a target about money must not be offered against "ballpoint pen"). Distractors must be plausible, same part of speech, same register.
+- Every sentence must be about this LAC's own topic. Never reuse wording, names, numbers or examples from the reference material.
 
 DIALOGUE-CLOZE IS DIFFERENT. Its "rounds" holds two OBJECTS, each with a pre-rendered chat — never an array of arrays, never {id, lines, answer}:
 "rounds": [
@@ -390,59 +433,25 @@ function sanitize(value: unknown, depth = 0): unknown {
 }
 
 
-/** Models emit unescaped quotes inside strings (`""sentence""`). Repair rather than fail. */
-export function repairJson(text: string): string {
-  let out = '';
-  let inString = false;
-  let escaped = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) { out += ch; escaped = false; continue; }
-      if (ch === '\\') { out += ch; escaped = true; continue; }
-      if (ch === '"') {
-        let j = i + 1;
-        while (j < text.length && /\s/.test(text[j])) j++;
-        const next = text[j];
-        if (next === ':' || next === ',' || next === '}' || next === ']' || next === undefined) {
-          inString = false;
-          out += ch;
-          continue;
-        }
-        out += '\\"';
-        continue;
-      }
-      if (ch === '\n') { out += '\\n'; continue; }
-      if (ch === '\r') { out += '\\r'; continue; }
-      if (ch === '\t') { out += '\\t'; continue; }
-      out += ch;
-      continue;
-    }
-    if (ch === '"') { inString = true; out += ch; continue; }
-    out += ch;
-  }
-  return out.replace(/,\s*([}\]])/g, '$1');
-}
-
-
-/** Widget-specific shapes the model reliably gets wrong, checked before assembly. */
+/** Widget-specific shapes the model reliably gets wrong. These are warnings now:
+ *  a malformed module must not throw away the other seven. */
 export function lacBuildShapeErrors(build: LacBuild): string[] {
   const errors: string[] = [];
   for (const m of build.modules) {
     if (m?.widget === 'dialogue-cloze') {
       const rounds = (m as { rounds?: unknown }).rounds;
       if (!Array.isArray(rounds) || rounds.length !== 2) {
-        errors.push('dialogue-cloze "rounds" must be an array of exactly 2 objects');
+        errors.push('dialogue-cloze "rounds" should be an array of exactly 2 objects');
       } else {
         rounds.forEach((round, i) => {
           if (!round || Array.isArray(round) || typeof round !== 'object') {
-            errors.push(`dialogue-cloze rounds[${i}] must be an object with words, html and why (not an array)`);
+            errors.push(`dialogue-cloze rounds[${i}] should be an object with words, html and why`);
             return;
           }
           const r = round as Record<string, unknown>;
-          if (!Array.isArray(r.words)) errors.push(`dialogue-cloze rounds[${i}].words must be an array of strings`);
+          if (!Array.isArray(r.words)) errors.push(`dialogue-cloze rounds[${i}].words should be an array of strings`);
           if (typeof r.html !== 'string' || !r.html.includes('chat-bubble')) {
-            errors.push(`dialogue-cloze rounds[${i}].html must be the rendered chat markup containing chat-bubble divs`);
+            errors.push(`dialogue-cloze rounds[${i}].html should be the rendered chat markup`);
           }
         });
       }
@@ -460,7 +469,7 @@ export function lacBuildShapeErrors(build: LacBuild): string[] {
           round.forEach((item, j) => {
             const bucket = (item as { bucket?: string } | null)?.bucket;
             if (bucket && !keys.includes(bucket)) {
-              errors.push(`two-bucket-triage rounds[${i}][${j}].bucket must be the bucket KEY ${JSON.stringify(keys)}, not its label`);
+              errors.push(`two-bucket-triage rounds[${i}][${j}].bucket should be the bucket KEY, not its label`);
             }
           });
         });
@@ -470,9 +479,9 @@ export function lacBuildShapeErrors(build: LacBuild): string[] {
   return errors;
 }
 
-export function parseLacBuild(answer: string): { build: LacBuild | null; errors: string[] } {
+export function parseLacBuild(answer: string): { build: LacBuild | null; errors: string[]; warnings: string[] } {
   const text = (answer || '').trim();
-  if (!text) return { build: null, errors: ['empty reply'] };
+  if (!text) return { build: null, errors: ['empty reply'], warnings: [] };
   const candidates = [text];
   const fence = /```(?:json)?\s*([\s\S]*?)```/gi;
   for (let m = fence.exec(text); m; m = fence.exec(text)) if (m[1]?.trim()) candidates.push(m[1].trim());
@@ -490,17 +499,15 @@ export function parseLacBuild(answer: string): { build: LacBuild | null; errors:
     const errors: string[] = [];
     const modules = obj.modules as LacBuildModule[];
     const chapters = Array.isArray(obj.chapters) ? (obj.chapters as LacBuildChapter[]) : [];
-    if (modules.length !== 8) errors.push(`expected 8 modules, found ${modules.length}`);
-    if (chapters.length !== 4) errors.push(`expected 4 chapters, found ${chapters.length}`);
-    const widgets = modules.map((m) => m?.widget);
-    if (new Set(widgets).size !== widgets.length) errors.push('two modules share the same widget');
+    if (modules.length < 1) errors.push('no modules found');
+    if (chapters.length < 1) errors.push('no chapters found');
     modules.forEach((m, i) => {
       if (!m || typeof m !== 'object') { errors.push(`module ${i + 1} is not an object`); return; }
       if (!m.id) errors.push(`module ${i + 1} has no id`);
       if (!m.widget) errors.push(`module ${i + 1} has no widget`);
       if (!m.rounds && !m.buckets) errors.push(`module ${i + 1} (${m.widget ?? '?'}) has neither rounds nor buckets`);
     });
-    if (errors.length) return { build: null, errors };
+    if (errors.length) return { build: null, errors, warnings: [] };
 
     const shaped: LacBuild = {
       title: typeof obj.title === 'string' ? obj.title : 'Worksheet',
@@ -508,12 +515,11 @@ export function parseLacBuild(answer: string): { build: LacBuild | null; errors:
       chapters,
       modules: modules.map((m) => sanitize(m) as LacBuildModule),
     };
-    const shapeErrors = lacBuildShapeErrors(shaped);
-    if (shapeErrors.length) return { build: null, errors: shapeErrors };
+    const shapeWarnings = lacBuildShapeErrors(shaped);
 
-    return { build: shaped, errors: [] };
+    return { build: shaped, errors: [], warnings: shapeWarnings };
   }
-  return { build: null, errors: ['no JSON object with a modules array was found'] };
+  return { build: null, errors: ['no JSON object with a modules array was found'], warnings: [] };
 }
 
 const escHtml = (v: unknown) =>
@@ -525,24 +531,28 @@ export function buildLacDocument(build: LacBuild, chassis: LacChassis, date = ''
     .map((c, i) => `      <a href="#mov-${i + 1}" class="chapter-tab">${String(i + 1).padStart(2, '0')} · ${escHtml(c.title)}</a>`)
     .join('\n');
 
+  const perChapter = Math.max(1, Math.ceil(build.modules.length / Math.max(1, build.chapters.length)));
   const chapters = build.chapters
     .map((c, i) => {
       const mounts = build.modules
-        .slice(i * 2, i * 2 + 2)
+        .slice(i * perChapter, (i + 1) * perChapter)
         .map((m) => {
           const cfg = JSON.stringify(m).replace(/</g, '\\u003c');
           return `      <div class="atomic-mount"><script type="application/json" class="atomic-config">${cfg}</script></div>`;
         })
         .join('\n');
-      return `    <section class="chapter-module ${LAC_THEMES[i] ?? 'theme-ocean'}" id="mov-${i + 1}">
+      return `    <section class="chapter-module ${LAC_THEMES[i] ?? 'theme-ocean'} exercise-card" id="mov-${i + 1}" data-category="chapter-${i + 1}">
       <div class="chapter-head">
         <div>
           <span class="chapter-kicker">${escHtml(c.kicker)}</span>
           <h2 class="chapter-title">${escHtml(c.title)}</h2>
           <p class="chapter-sub">${escHtml(c.sub)}</p>
         </div>
+        <div class="card-action-bar"><button type="button" class="regenerate-btn" data-category="chapter-${i + 1}" data-prompt="${escHtml(buildChapterRefreshPrompt(build, i))}"><svg class="regen-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>Generate New Questions</button></div>
       </div>
+      <div class="question-item" id="chapter-${i + 1}-container">
 ${mounts}
+      </div>
     </section>`;
     })
     .join('\n\n');
@@ -558,6 +568,38 @@ ${mounts}
 ${chassis.links || ''}
 <style>
 ${chassis.styles}
+</style>
+<style>
+  /* Refresh control: the host portal binds .regenerate-btn and replaces the
+     contents of .question-item / #*-container with the model's reply. */
+  .card-action-bar { display: flex; align-items: center; gap: 8px; flex: none; }
+  .regenerate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--sec-bright, #ffffff);
+    background: var(--sec-soft, rgba(255, 255, 255, 0.08));
+    border: 1px solid var(--sec-border, rgba(255, 255, 255, 0.2));
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .regenerate-btn:hover {
+    background: var(--sec, #ffffff);
+    border-color: var(--sec, #ffffff);
+    color: #0b0c0e;
+  }
+  .regenerate-btn:focus-visible {
+    outline: 2px solid var(--sec-bright, #ffffff);
+    outline-offset: 2px;
+  }
+  .regen-icon { width: 14px; height: 14px; flex: none; }
+  .question-item { display: block; }
 </style>
 </head>
 <body>
@@ -592,7 +634,62 @@ ${chapters}
 <script>
 ${engine}
 </script>
+<script>
+  /* The host portal replaces a chapter's .question-item contents with the
+     model's reply. That reply carries fresh .atomic-mount blocks, so mount
+     them once they land. mountAll() skips anything already data-mounted. */
+  (function () {
+    var engine = window.LACAtomicEngine;
+    if (!engine || typeof engine.mountAll !== 'function') return;
+    if (!window.MutationObserver) return;
+    var queued = false;
+    function remount() {
+      if (queued) return;
+      queued = true;
+      setTimeout(function () {
+        queued = false;
+        engine.mountAll();
+      }, 0);
+    }
+    new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i++) {
+        var added = records[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var node = added[j];
+          if (node.nodeType !== 1) continue;
+          if (node.classList.contains('atomic-mount') || node.querySelector('.atomic-mount')) {
+            remount();
+            return;
+          }
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  })();
+</script>
 </body>
 </html>
 `;
+}
+
+/** Parse a single regenerated module out of a reply. */
+export function parseLacModule(answer: string): { module: LacBuildModule | null; errors: string[] } {
+  const text = (answer || '').trim();
+  if (!text) return { module: null, errors: ['empty reply'] };
+  const candidates = [text];
+  const fence = /```(?:json)?\s*([\s\S]*?)```/gi;
+  for (let m = fence.exec(text); m; m = fence.exec(text)) if (m[1]?.trim()) candidates.push(m[1].trim());
+  candidates.push(...topLevelObjects(text));
+
+  for (const candidate of candidates) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(candidate); } catch {
+      try { parsed = JSON.parse(repairJson(candidate)); } catch { continue; }
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    const obj = parsed as Record<string, unknown>;
+    if (typeof obj.widget !== 'string') continue;
+    if (!obj.rounds && !obj.buckets) continue;
+    return { module: sanitize(obj) as LacBuildModule, errors: [] };
+  }
+  return { module: null, errors: ['no module object with a widget and rounds/buckets was found'] };
 }

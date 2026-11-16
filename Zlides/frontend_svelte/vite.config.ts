@@ -120,6 +120,7 @@ export default defineConfig(() => {
                 });
               };
               const normalizeForSave = (raw: string): string => {
+                if (raw.includes('zlides-doc-kind')) return raw;
                 const unescaped = decodeHtmlPayload(raw);
                 const SEP = "<!-- zlides:page-break -->";
                 const extractBody = (h: string) => {
@@ -136,29 +137,43 @@ export default defineConfig(() => {
                   let headInner = extractHead(first);
                   const fix = `\n<style>\nhtml,body{background:#0f1112 !important;margin:0;padding:0;}\nbody{overflow:auto !important;height:auto !important;min-height:100vh;color:#e5e7eb;}\n.slide{width:100% !important;max-width:1280px !important;margin:0 auto !important;height:auto !important;min-height:0 !important;max-width:100%;}\n</style>`;
                   headInner += fix;
-                  const bodies = pages.map(extractBody).join('\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
+                  const bodies = pages.map(extractBody).join('\n<!-- zlides:page-break -->\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
                   return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n<body style="background:#0f1112;color:#e5e7eb;margin:0;padding:24px;max-width:100%;overflow:auto;">\n${bodies}\n</body>\n</html>`;
                 };
-                if (unescaped.includes(SEP)) {
+                const dc = (unescaped.match(/<!DOCTYPE/gi) || []).length;
+                if (dc <= 1 && unescaped.includes('zlides-page-separator')) {
+                  return unescaped;
+                }
+                if (unescaped.includes(SEP) && dc > 1) {
                   const parts = unescaped.split(SEP).map((s: string) => s.trim()).filter(Boolean);
                   return assemble(parts);
                 }
-                const dc = (unescaped.match(/<!DOCTYPE/gi) || []).length;
                 if (dc > 1) {
                   const parts = unescaped.split(/(?=<!DOCTYPE)/gi).map((s: string) => s.trim()).filter(Boolean);
                   if (parts.length > 1) return assemble(parts);
                 }
                 return unescaped;
               };
-              html = decodeHtmlPayload(normalizeForSave(html));
+              html = html.includes('zlides-doc-kind') ? html : decodeHtmlPayload(normalizeForSave(html));
               const savedDir = path.resolve(__dirname, '../saved_slides');
               if (!fs.existsSync(savedDir)) fs.mkdirSync(savedDir, { recursive: true });
 
               const now = new Date();
-              const ts = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-              const clean = (title || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
-              const filename = `slide_${ts}_${clean}.html`;
-              const fp = path.join(savedDir, filename);
+              const ymd = now.toISOString().slice(0, 10);
+              const slug = (title || 'Worksheet')
+                .replace(/\.html$/i, '')
+                .replace(/[^a-zA-Z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 72)
+                .replace(/-+$/g, '') || 'Worksheet';
+              let filename = `${slug}-${ymd}.html`;
+              let fp = path.join(savedDir, filename);
+              let suffix = 2;
+              while (fs.existsSync(fp)) {
+                filename = `${slug}-${ymd}-${suffix}.html`;
+                fp = path.join(savedDir, filename);
+                suffix += 1;
+              }
 
               fs.writeFileSync(fp, html, 'utf8');
               res.setHeader('Content-Type', 'application/json');

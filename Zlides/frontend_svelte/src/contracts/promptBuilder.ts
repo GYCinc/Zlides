@@ -11,6 +11,12 @@ export interface PromptAssembly {
   styleText: string;
   attachedMarkdown?: string;
   attachedFileName?: string;
+  /** Always-on global rules (PREFERENCES.md). Appended last so the layout
+   *  trigger keeps line 1 and the hard rules land in the final read pass. */
+  preferencesText?: string;
+  /** Active skill text. A skill may carry layout, content and style at once,
+   *  so it goes after everything and overrides the slots above it. */
+  skillText?: string;
 }
 
 export function assemblePrompt(p: PromptAssembly): string {
@@ -32,6 +38,14 @@ export function assemblePrompt(p: PromptAssembly): string {
   if (content.length) sections.push(content.join("\n\n"));
 
   if (p.styleText.trim()) sections.push(p.styleText.trim());
+
+  if (p.preferencesText && p.preferencesText.trim()) {
+    sections.push(
+      `=== GLOBAL PREFERENCES (ALWAYS APPLY — NOT CONTENT) ===\n${p.preferencesText.trim()}`
+    );
+  }
+
+  if (p.skillText && p.skillText.trim()) sections.push(p.skillText.trim());
 
   return sections.join("\n\n");
 }

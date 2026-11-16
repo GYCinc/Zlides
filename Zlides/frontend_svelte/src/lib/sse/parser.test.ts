@@ -622,4 +622,13 @@ describe("live fixtures (api.z.ai probe 2026-08-31)", () => {
     expect(page.html).toContain('charset="UTF-8"');
     expect(events.some((e) => e.kind === "stream_error")).toBe(false);
   });
+
+  test("finish_reason: length emits structured finish event for auto-continuation", () => {
+    const parser = new SseParser();
+    const events = parser.push(
+      'data: {"conversation_id":"conv-1","choices":[{"index":0,"finish_reason":"length","messages":[]}]}'
+    );
+    expect(events).toEqual([{ kind: "finish", reason: "length" }]);
+    expect(parser.conversationId).toBe("conv-1");
+  });
 });

@@ -139,20 +139,66 @@ export function assembleSingleDocument(pageHtmls: string[]): string {
   } else {
     headInner += responsiveFix;
   }
-  const bodies = sanitized.map(extractBodyInner).join('\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
+  const bodies = sanitized.map(extractBodyInner).join('\n<!-- zlides:page-break -->\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
   return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n<body style="background:#0f1112;color:#e5e7eb;margin:0;padding:24px;max-width:100%;overflow:auto;">\n${bodies}\n</body>\n</html>`;
 }
 
+export function splitSavedPages(html: string): string[] {
+  const SEP = "<!-- zlides:page-break -->";
+  const DIV_SEP = '<div class="zlides-page-separator"';
+  const trimmed = html.trim();
+  if (!trimmed) return [];
+  const headInner = extractHeadInner(trimmed);
+  const bodyMatch = trimmed.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+
+  // Case 1: full standalone multi-page bundle (e.g. Open mode joined raw pages)
+  const doctypeCount = (trimmed.match(/<!DOCTYPE/gi) || []).length;
+  if (doctypeCount > 1 && trimmed.includes(SEP)) {
+    return trimmed.split(SEP).map((s) => s.trim()).filter(Boolean);
+  }
+  if (doctypeCount > 1) {
+    const parts = trimmed.split(/(?=<!DOCTYPE)/gi).map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 1) return parts;
+  }
+
+  // Case 2: single-document assembled bundle with page-break comment and/or separator div inside <body>
+  if (bodyMatch && (bodyMatch[1].includes(SEP) || bodyMatch[1].includes(DIV_SEP))) {
+    const rawInner = bodyMatch[1]
+      .replace(/<div class="zlides-page-separator"[^>]*><\/div>/gi, SEP);
+    const chunks = rawInner
+      .split(SEP)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (chunks.length > 1) {
+      const bodyOpen = (trimmed.match(/<body[^>]*>/i) || ['<body style="background:#0f1112;color:#e5e7eb;margin:0;">'])[0];
+      return chunks.map((inner) => `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n${bodyOpen}\n${inner}\n</body>\n</html>`);
+    }
+  }
+
+  return [trimmed];
+}
+
 export function normalizeSavedHtml(html: string): string {
+  // Our own assembled documents already contain real escapes (the engine's JS uses \").
+  // Running the wire-payload decoder over them deletes those backslashes and breaks the
+  // script. The marker tells us to store the bytes exactly as produced.
+  if (html.includes('zlides-doc-kind')) return html;
   const decoded = decodeHtmlPayload(html);
   const SEP = "<!-- zlides:page-break -->";
-  if (decoded.includes(SEP)) {
+  const dc = (decoded.match(/<!DOCTYPE/gi) || []).length;
+  if (dc <= 1 && decoded.includes('zlides-page-separator')) {
+    return decoded;
+  }
+  if (decoded.includes(SEP) && dc > 1) {
     const parts = decoded.split(SEP).map((s) => s.trim()).filter(Boolean);
     return assembleSingleDocument(parts);
   }
-  const dc = (decoded.match(/<!DOCTYPE/gi) || []).length;
   if (dc > 1) {
     const parts = decoded.split(/(?=<!DOCTYPE)/gi).map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 1) return assembleSingleDocument(parts);
+  }
+  if (decoded.includes(SEP)) {
+    const parts = splitSavedPages(decoded);
     if (parts.length > 1) return assembleSingleDocument(parts);
   }
   return decoded;

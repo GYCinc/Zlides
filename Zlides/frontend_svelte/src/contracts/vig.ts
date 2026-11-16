@@ -13,6 +13,8 @@
  * /api/vig/contract, so the skill is the only place the rules live.
  */
 
+import { repairJson } from './jsonRepair';
+
 export interface VigCue {
   start: number;
   end: number;
@@ -157,7 +159,11 @@ export function extractCurriculumJson(answerText: string): VigCurriculum | null 
     try {
       parsed = JSON.parse(candidate);
     } catch {
-      continue;
+      try {
+        parsed = JSON.parse(repairJson(candidate));
+      } catch {
+        continue;
+      }
     }
     const curriculum = asCurriculum(parsed);
     if (curriculum) return curriculum;
@@ -296,4 +302,66 @@ export function compileVigGuide(
 
   if (compiled.includes(VIG_DOC_KIND_META)) return compiled;
   return compiled.replace(/<head(\s[^>]*)?>/i, (tag) => `${tag}\n${VIG_DOC_KIND_META}`);
+}
+
+export interface VigRepair { vocab: VigCurriculum; repairs: string[] }
+
+/**
+ * Salvage a curriculum instead of discarding it.
+ *
+ * A single shared timestamp used to reject the entire guide. Per GUARDRAILS G12 the
+ * rule is "keep one and record why", so duplicates are dropped with a note, as are
+ * items in the opening 15 seconds. Segments left empty are removed and renumbered.
+ */
+export function repairCurriculum(vocab: VigCurriculum, cues: VigCue[] = []): VigRepair {
+  const repairs: string[] = [];
+  const seen = new Map<number, string>();
+  const segments: VigSegment[] = [];
+
+  for (const segment of vocab.segments ?? []) {
+    const kept: VigItem[] = [];
+    for (const original of segment.items ?? []) {
+      let item = original;
+      const term = typeof item?.term === 'string' ? item.term : '(unnamed)';
+      if (!isFiniteNumber(item?.timestamp)) {
+        repairs.push(`dropped ${term}: no usable timestamp`);
+        continue;
+      }
+      if (item.timestamp < 15) {
+        repairs.push(`dropped ${term}: ${item.timestamp}s is inside the opening 15 seconds`);
+        continue;
+      }
+      // The model sometimes anchors a term to the NEXT cue's start. If the term is
+      // actually spoken in an earlier cue, move it there instead of losing the word.
+      if (cues.length) {
+        const needle = term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const spoken = cues.filter((c) => new RegExp(`\\b${needle}\\b`, 'i').test(c.text));
+        if (spoken.length) {
+          let best = spoken[0];
+          for (const cue of spoken) {
+            if (Math.abs(cue.start - item.timestamp) < Math.abs(best.start - item.timestamp)) best = cue;
+          }
+          if (best.start !== item.timestamp) {
+            repairs.push(`moved ${term}: ${item.timestamp}s -> ${best.start}s, the cue where it is actually spoken`);
+            item = { ...item, timestamp: best.start };
+          }
+        }
+      }
+      const clash = seen.get(item.timestamp);
+      if (clash) {
+        repairs.push(`dropped ${term}: shares ${item.timestamp}s with ${clash}`);
+        continue;
+      }
+      seen.set(item.timestamp, term);
+      kept.push(item);
+    }
+    if (kept.length === 0) {
+      repairs.push(`dropped segment ${segment?.number ?? '?'} ("${segment?.title ?? ''}"): no usable items left`);
+      continue;
+    }
+    segments.push({ ...segment, items: kept });
+  }
+
+  const renumbered = segments.map((segment, index) => ({ ...segment, number: index + 1, id: `seg-${index + 1}` }));
+  return { vocab: { segments: renumbered }, repairs };
 }

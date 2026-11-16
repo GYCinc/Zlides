@@ -23,6 +23,7 @@ export type SseEvent =
   | { kind: "answer"; text: string }
   | { kind: "stream_error"; code: string | null; message: string }
   | { kind: "usage"; totalTokens: number }
+  | { kind: "finish"; reason: string }
   | { kind: "done" };
 
 export type PageEvent = Extract<SseEvent, { kind: "page" }>;
@@ -247,9 +248,17 @@ export class SseParser {
         for (const msg of messages) {
           if (isRecord(msg)) this.handleMessageLike(msg, events);
         }
+        const finishReason = asString(choice.finish_reason);
+        if (finishReason !== null) {
+          events.push({ kind: "finish", reason: finishReason });
+        }
       }
     } else {
       this.handleMessageLike(chunk, events);
+      const topFinish = asString(chunk.finish_reason);
+      if (topFinish !== null) {
+        events.push({ kind: "finish", reason: topFinish });
+      }
     }
 
     const usage = chunk.usage;

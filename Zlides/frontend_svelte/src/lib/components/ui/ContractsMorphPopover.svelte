@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { cn } from '$lib/utils';
+  import docTypeJson from '../../../../../type/document.json';
+  import slidesTypeJson from '../../../../../type/slides.json';
+  import webpageTypeJson from '../../../../../type/webpage.json';
+  import worksheetFormatJson from '../../../../../format/regenerating-worksheet.json';
+  import reportFormatJson from '../../../../../format/continuous-report.json';
 
   interface Props {
     typeSpace: string;
@@ -8,6 +13,7 @@
     styleSpace: string;
     previewMode: 'document' | 'slides' | 'webpage';
     contractsSigned: boolean;
+    defaultStyleTokens?: string;
     class?: string;
     ontypechange?: (mode: 'document' | 'slides' | 'webpage') => void;
   }
@@ -18,6 +24,7 @@
     styleSpace = $bindable(''),
     previewMode = $bindable('document'),
     contractsSigned,
+    defaultStyleTokens = '',
     class: className = '',
     ontypechange,
   }: Props = $props();
@@ -28,11 +35,11 @@
   let activeTab = $state<'type' | 'format' | 'style'>('type');
   let popoverRef = $state<HTMLDivElement | null>(null);
 
-  const DEFAULT_TYPE_PROMPT = 'Generate an A4 print-ready educational document in standalone HTML with embedded CSS.';
-  const SLIDES_TYPE_PROMPT = 'Generate a 16:9 presentation slide deck formatted in clean standalone HTML with embedded CSS.';
-  const WEBPAGE_TYPE_PROMPT = 'Generate a fluid continuous single-scroll report formatted in clean standalone HTML with embedded CSS.';
-  const DEFAULT_FORMAT_PROMPT = 'Strict modular layout: 8 distinct exercise modules with Cloze blanks, multiple choice options, and self-study boxes.';
-  const CONTINUOUS_REPORT_PROMPT = 'Single-scroll report layout: fluid height, Bento grid cards, KPI statistics, and vocabulary comparison matrices.';
+  const DEFAULT_TYPE_PROMPT = docTypeJson.prompt;
+  const SLIDES_TYPE_PROMPT = slidesTypeJson.prompt;
+  const WEBPAGE_TYPE_PROMPT = webpageTypeJson.prompt;
+  const DEFAULT_FORMAT_PROMPT = worksheetFormatJson.prompt;
+  const CONTINUOUS_REPORT_PROMPT = reportFormatJson.prompt;
   const DEFAULT_STYLE_TOKENS = 'Palette A: Deep Charcoal (#131313, #16181a), Pale Gold / Honey Amber (#f0b23e), Seafoam Teal (#4fb3a9), High-contrast Pure White text on dark cards.';
 
   function closeMenu() {
@@ -110,9 +117,6 @@
       <line x1="16" y1="17" x2="8" y2="17" />
     </svg>
     <span>Contracts</span>
-    <span class={cn('text-xs font-mono px-1.5 py-0.2 rounded font-semibold', contractsSigned ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40' : 'bg-rose-950/80 text-rose-400 border border-rose-500/40')}>
-      {contractsSigned ? 'signed' : 'unsigned'}
-    </span>
   </button>
 
   <!-- Morphing Contracts Popover -->
@@ -245,13 +249,6 @@
                   >
                     Worksheet
                   </button>
-                  <button
-                    type="button"
-                    class="text-xs px-2 py-0.5 rounded bg-[#1e2227] border border-[#343b44] text-neutral-200 hover:border-[#4fb3a9] hover:text-white"
-                    onclick={() => formatSpace = CONTINUOUS_REPORT_PROMPT}
-                  >
-                    Report
-                  </button>
                 </div>
               </div>
               <textarea
@@ -265,13 +262,22 @@
             <div class="flex flex-col gap-2 flex-1">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-[#f0b23e] uppercase tracking-wider">Style Tokens (Palette A)</span>
-                <button
-                  type="button"
-                  class="text-xs px-2 py-0.5 rounded bg-[#1e2227] border border-[#343b44] text-neutral-200 hover:border-[#f0b23e] hover:text-white"
-                  onclick={() => styleSpace = DEFAULT_STYLE_TOKENS}
-                >
-                  Reset Palette A
-                </button>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    class="text-xs px-2 py-0.5 rounded bg-[#1e2227] border border-[#343b44] text-neutral-200 hover:border-[#f0b23e] hover:text-white"
+                    onclick={() => styleSpace = defaultStyleTokens || DEFAULT_STYLE_TOKENS}
+                  >
+                    Palette A
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs px-2 py-0.5 rounded bg-[#1e2227] border border-[#343b44] text-neutral-200 hover:border-[#f0b23e] hover:text-white"
+                    onclick={() => styleSpace = ''}
+                  >
+                    Auto (None)
+                  </button>
+                </div>
               </div>
               <textarea
                 bind:value={styleSpace}

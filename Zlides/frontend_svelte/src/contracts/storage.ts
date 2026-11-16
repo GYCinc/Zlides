@@ -42,6 +42,35 @@ export async function fetchSavedSlideHtml(filename: string): Promise<string> {
 
 import { normalizeSavedHtml } from "../lib/sse/placeholders.js";
 
+export function cleanExportFilename(rawTitle?: string | null, html?: string | null, fallback = "Worksheet"): string {
+  let candidate = (rawTitle ?? "").trim();
+  if (!candidate && html) {
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleMatch && titleMatch[1].trim()) candidate = titleMatch[1].trim();
+  }
+  if (!candidate && html) {
+    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    if (h1Match) {
+      const stripped = h1Match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (stripped) candidate = stripped;
+    }
+  }
+  if (!candidate) candidate = fallback;
+  const decoded = candidate
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+  const slug = decoded
+    .replace(/\.html$/i, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/g, "");
+  return `${slug || "Worksheet"}.html`;
+}
+
 export async function saveSlideToStorage(html: string, promptText: string): Promise<SavedSlide> {
   html = normalizeSavedHtml(html);
   const now = Date.now();
@@ -53,14 +82,15 @@ export async function saveSlideToStorage(html: string, promptText: string): Prom
     minute: "2-digit",
   });
 
-  let title = promptText.trim().slice(0, 40) || "Untitled Worksheet";
+  let title = promptText.trim().slice(0, 60) || "Untitled Worksheet";
   const titleMatch = html.match(/<title>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1].trim()) {
     title = titleMatch[1].trim();
   }
 
-  const cleanName = title.toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 30);
-  const filename = `slide_${now}_${cleanName}.html`;
+  const baseFile = cleanExportFilename(title, html, "Worksheet").replace(/\.html$/i, "");
+  const ymd = d.toISOString().slice(0, 10);
+  const filename = `${baseFile}-${ymd}.html`;
 
   const item: SavedSlide = {
     id: filename,
@@ -73,11 +103,18 @@ export async function saveSlideToStorage(html: string, promptText: string): Prom
 
   // 1. Try to save to disk via Vite middleware
   try {
-    await fetch("/save-slide", {
+    const res = await fetch("/save-slide", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ html, title }),
     });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data && typeof data.filename === "string" && data.filename.trim()) {
+        item.filename = data.filename.trim();
+        item.id = item.filename;
+      }
+    }
   } catch (e) {
     console.warn("Could not save to disk:", e);
   }
