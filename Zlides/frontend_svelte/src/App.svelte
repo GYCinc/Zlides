@@ -2510,7 +2510,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
     <!-- Preview Top Bar: View mode, Stage fit, Centered Page Stepper, and Actions -->
     <div class="flex-shrink-0 h-12 border-b border-ge-border bg-ge-card flex items-center justify-between px-3 gap-2 relative z-20 overflow-visible">
       <!-- Center: Live Streaming Indicator -->
-      <div class="flex items-center gap-2">
+      <div class="flex-1 flex items-center justify-center gap-2">
         {#if status !== 'Ready' && !isGenerating}
           <span class="text-sm text-neutral-300 truncate max-w-[300px]" title={status}>{status}</span>
         {/if}
