@@ -178,7 +178,7 @@
     {#if selectedOption?.accentColor}
       <span class="h-2.5 w-2.5 rounded-full shrink-0 shadow-sm" style="background-color: {selectedOption.accentColor}"></span>
     {/if}
-    <span class="text-sm font-semibold text-white group-hover:text-ge-accent transition-colors truncate max-w-[145px]">
+    <span class="text-sm font-semibold text-white group-hover:text-ge-accent transition-colors truncate max-w-[220px]">
       {displayLabel}
     </span>
 

@@ -9,7 +9,7 @@ If a change makes the app fail to render, that change is reverted — not "impro
 
 ## Allowed without asking — exactly these three
 1. **Sidebar and stage presentation** — markup, layout, spacing, the logo, the composer.
-2. **The option lists of the four dropdowns** (Layout · Format · Style · Skills).
+2. **The option lists of the four dropdowns** (Layout · Content · Style · skill).
    The *injected text* behind them is owned by the contract files (see Forbidden).
 3. **Documentation** — this file, `SPEC.md`, `PREFERENCES.md`.
 
@@ -27,22 +27,31 @@ If a change makes the app fail to render, that change is reverted — not "impro
    `format/regenerating-worksheet.json`. Do not re-add it "for completeness".
 
 ## Standing UI spec — the owner's words, settled. Do not re-derive, do not ask.
-1. **Sidebar, beside the logo, in this order: Layout · Format · Style.** Three slots, always
-   there. Nothing else shares that row. Format may be `None`; Style may be `Auto (None)`.
-2. Under them: the original **Worksheet | Video Guide** tab strip (Video Guide =
-   Video Immersion Guide) and **one** Skills button. One place only — never both.
-3. **Composer row: two small icons only** — a paperclip (attach) and an arrow (generate),
-   32px. Stop replaces generate while running. No text buttons, no bottom action bar.
-4. **Top bar: Export · Vault · API Key. Nothing else.** No engine dropdown, no Preview
-   dropdown, no Contracts, no Skills, no "Page X of Y", no cost.
-5. **Page navigation = one chevron on each edge of the page.** No page counter module.
-6. **Cost** lives at the bottom of the sidebar, out of the way.
-7. **Labels come from his files** (`type/`, `format/`, `style/` `name` fields). No invented
-   copy, no invented sublabels, no invented terms anywhere in the UI.
-8. **Nothing is added unless he asks for it.** If he says "remove X", X is deleted — not
-   relocated, not re-labelled, not kept "for completeness".
-9. When he says stop, stop. When he repeats an instruction, that is a hard stop signal
-   plus a pending edit — execute it, don't re-derive it, don't ask again.
+1. **Top bar, left to right: Layout · Content · Style · skill select.** The second slot is
+   called **Content**, never "Format" — agents read "format" as a third layout/style axis.
+   Trigger labels show the value only (no category prefixes):
+   `A4 Document` / `16:9 Slides` / `Fluid Webpage`;
+   `None` / `Video Immersion Guide` / `Regenerating Worksheet` (+ saved content);
+   `Auto` (first) / `gitEnglish` / `DESIGN.md` (+ saved styles);
+   skill name or `Select skill`.
+2. **Top bar, right: cost · PREFERENCES.md · Export · Vault · API Key.** Nothing else.
+   The free space in the middle holds the status.
+3. **The sidebar is one panel: the chat box (with the logo inside it) + the composer.**
+   No greeting copy, no "Worksheet Engine" labels, no separate logo block.
+4. **Composer: one visible writing line, two small icons on it** — paperclip (attach) left,
+   arrow (send) right, an expand icon that opens the writing area large. Stop replaces the
+   arrow while running. The writing box must be visibly framed (copy/paste/edit in place).
+5. **Content and Style each have `Add new`** → a fill-in (name + text) pre-filled with the
+   schema: style → the design.md schema he gave us, content → the blueprint. Saved entries
+   appear in their dropdowns. This is the only "custom" path; there is no bare "Custom" item.
+6. **PREFERENCES.md is its own thing**: taken with every call, reachable from the top bar.
+   AGENTS.md has nothing to do with generation.
+7. **Page navigation = one chevron on each edge of the page.** No page counter module.
+8. **Labels come from his files** (`type/`, `format/`, `style/` `name` fields). No invented
+   copy, no invented sublabels, no invented icons, no invented terms anywhere in the UI.
+9. **Nothing is added unless he asks.** "Remove X" means delete — not relocate, not rename.
+   Vertical space is never wasted. When he repeats an instruction, that is a hard stop
+   signal plus a pending edit: execute it, verify by running the app, report measured facts.
 
 ## Method rules
 - Edit source with the **edit tool**. Never Python or heredoc string surgery on a source
