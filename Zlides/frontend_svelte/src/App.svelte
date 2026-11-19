@@ -600,9 +600,11 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
 
   const formatChoice = $derived(
     appMode === 'vig' ? 'vig'
-      : formatSpace.trim() === '' ? 'none'
-        : formatSpace.trim() === DEFAULT_FORMAT_PROMPT.trim() ? 'worksheet'
-          : 'custom'
+      : appMode === 'open' ? 'offline-vig'
+        : appMode === 'lac' ? 'lac'
+          : formatSpace.trim() === '' ? 'none'
+            : formatSpace.trim() === DEFAULT_FORMAT_PROMPT.trim() ? 'worksheet'
+              : 'custom'
   );
 
   function setStyleChoice(id: string) {
@@ -623,9 +625,16 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
   let customEditorText = $state('');
   let isPrefsOpen = $state(false);
   let isPromptEditorOpen = $state(false);
+  let isSettingsOpen = $state(false);
+  let settingsTab = $state<'prompts' | 'custom' | 'prefs'>('prompts');
+
+  function deleteCustomEntry(id: string) {
+    customEntries = customEntries.filter((c) => c.id !== id);
+    localStorage.setItem('zlides_custom_entries', JSON.stringify(customEntries));
+  }
 
   /** The schema is shown pre-filled so a new entry can be written by hand:
-   *  style → the design.md schema he gave us, content → the blueprint. */
+   *  style → the design.md schema he gave us, content → the format contract. */
   function openCustomEditor(kind: 'content' | 'style') {
     customEditorKind = kind;
     customEditorName = '';
@@ -658,11 +667,15 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
   const contentLabel = $derived(
     appMode === 'vig'
       ? 'Video Immersion Guide'
-      : formatChoice === 'none'
-        ? 'None'
-        : formatChoice === 'worksheet'
-          ? worksheetFormatJson.name
-          : customEntries.find((c) => c.kind === 'content' && c.text.trim() === formatSpace.trim())?.name ?? 'Custom'
+      : appMode === 'open'
+        ? 'Offline Video Immersion Guide'
+        : appMode === 'lac'
+          ? 'Lesson Asset Worksheet'
+          : formatChoice === 'none'
+            ? 'None'
+            : formatChoice === 'worksheet'
+              ? 'Worksheet'
+              : customEntries.find((c) => c.kind === 'content' && c.text.trim() === formatSpace.trim())?.name ?? 'Custom'
   );
   const styleLabel = $derived(
     styleChoice === 'auto'
@@ -836,8 +849,8 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
       appMode = 'sheet';
       const sheetParts = splitSavedPages(html);
       pages = sheetParts.length > 0
-        ? sheetParts.map((partHtml: string, i: number) => ({ position: i + 1, html: ensurePlaceholders(partHtml) }))
-        : [{ position: 1, html: ensurePlaceholders(html) }];
+        ? sheetParts.map((partHtml: string, i: number) => ({ position: i + 1, html: decodeHtmlPayload(partHtml) }))
+        : [{ position: 1, html: decodeHtmlPayload(html) }];
       selectedPageIndex = 0;
       // W3/W4: a vault deck has no live server conversation — decouple continuation
       // and server export from the previously streamed session.
@@ -998,7 +1011,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
       isEditingHtml = false;
       return;
     }
-    const ensured = appMode === 'open' ? decodeHtmlPayload(editorHtml) : ensurePlaceholders(editorHtml);
+    const ensured = appMode !== 'open' && formatChoice === 'worksheet' ? ensurePlaceholders(editorHtml) : decodeHtmlPayload(editorHtml);
     if (pages.length === 0) {
       pages = [{ position: 1, html: ensured }];
       selectedPageIndex = 0;
@@ -1646,8 +1659,9 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
     status = "Connecting to Z.AI Agent...";
 
     const isOpenMode = appMode === 'open';
+    const isRegeneratingWorksheet = !isOpenMode && formatChoice === 'worksheet';
     const finalizePageHtml = (rawHtml: string) =>
-      isOpenMode ? decodeHtmlPayload(rawHtml) : ensurePlaceholders(rawHtml);
+      isRegeneratingWorksheet ? ensurePlaceholders(rawHtml) : decodeHtmlPayload(rawHtml);
 
     // ── Strict injection order: 1. Layout (Type) → 2. Format / Active Skill → 3. Content → 4. Style ──
     const skillsBlock = activeSkillBlock();
@@ -1658,7 +1672,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
             typeText: isOpenFollowUp ? '' : typeSpace,
             formatText: skillsBlock,
             userText: textToSend,
-            styleText: '',
+            styleText: isOpenFollowUp ? '' : styleSpace,
             attachedMarkdown: extractedMarkdown,
             attachedFileName: fileName,
             preferencesText: PREFERENCES_TEXT,
@@ -2510,15 +2524,15 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
 
   <!-- Preview stage: responsive layout with zero outer scrollbars -->
   <div class="flex-grow bg-ge-bg relative flex flex-col min-w-0 overflow-hidden">
-    <!-- Preview Top Bar: the choices left to right, then status, then cost/prefs/actions -->
-    <div class="flex-shrink-0 h-12 border-b border-ge-border bg-ge-card flex items-center justify-between px-3 gap-2 relative z-20 overflow-visible">
-      <!-- Left: Layout → Content → Style → skill -->
-      <div class="flex items-center gap-1.5 shrink-0">
+    <!-- Preview Top Bar: Document Type → Content → Style (evenly spaced), status, then actions + Settings -->
+    <div class="flex-shrink-0 h-14 border-b border-ge-border bg-ge-card flex items-center justify-between px-4 gap-3 relative z-20 overflow-visible">
+      <!-- Left: Evenly-spaced 3-slot pipeline: Document Type → Content → Style (+ Skill) -->
+      <div class="flex items-center gap-2.5 shrink-0">
         <MorphDropdown
           value={previewMode}
           label={layoutLabel}
-          width={200}
-          buttonClass="px-2 py-1"
+          width={210}
+          buttonClass="px-3 py-1.5"
           onselect={(opt) => applyLayoutType(opt.id as 'document' | 'slides' | 'webpage')}
           options={[
             { id: 'document', label: 'A4 Document', accentColor: '#f0b23e' },
@@ -2529,13 +2543,14 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
         <MorphDropdown
           value={formatChoice}
           label={contentLabel}
-          width={240}
-          buttonClass="px-2 py-1"
+          width={270}
+          buttonClass="px-3 py-1.5"
           onselect={() => { appMode = 'sheet'; formatSpace = DEFAULT_FORMAT_PROMPT; }}
           options={[
             { id: 'vig', label: 'Video Immersion Guide', accentColor: '#b98cf0', onclick: () => { appMode = 'vig'; } },
-            { id: 'worksheet', label: worksheetFormatJson.name, accentColor: '#f0b23e' },
-            { id: 'none', label: 'None', accentColor: '#9ca3af', onclick: () => { appMode = 'sheet'; formatSpace = ''; } },
+            { id: 'offline-vig', label: 'Offline Video Immersion Guide', accentColor: '#4fb3a9', onclick: () => { appMode = 'open'; } },
+            { id: 'lac', label: 'Lesson Asset Worksheet', accentColor: '#ff6b35', onclick: () => { appMode = 'lac'; } },
+            { id: 'worksheet', label: 'Worksheet', accentColor: '#f0b23e', onclick: () => { appMode = 'sheet'; formatSpace = DEFAULT_FORMAT_PROMPT; } },
             ...customEntries.filter((c) => c.kind === 'content').map((c) => ({
               id: `content-${c.id}`, label: c.name, accentColor: '#ffffff',
               onclick: () => { appMode = 'sheet'; formatSpace = c.text; }
@@ -2547,7 +2562,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           value={styleChoice}
           label={styleLabel}
           width={210}
-          buttonClass="px-2 py-1"
+          buttonClass="px-3 py-1.5"
           onselect={(opt) => setStyleChoice(opt.id)}
           options={[
             { id: 'auto', label: 'Auto', accentColor: '#9ca3af' },
@@ -2564,7 +2579,7 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
           value={activeSkillEntry?.id ?? 'none'}
           label={skillLabel}
           width={210}
-          buttonClass="px-2 py-1"
+          buttonClass="px-3 py-1.5"
           onselect={(opt) => selectSkill(opt.id === 'none' ? null : opt.id)}
           options={[
             { id: 'none', label: 'None', accentColor: '#9ca3af' },
@@ -2648,6 +2663,16 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
         </button>
 
         <div class="h-4 w-[1px] bg-ge-border mx-0.5"></div>
+
+        <button
+          type="button"
+          class="text-sm px-3 py-1.5 bg-ge-bg border border-ge-border hover:border-ge-accent/50 rounded-lg text-white font-medium hover:text-ge-accent transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+          onclick={() => { isSettingsOpen = true; }}
+          title="Edit Document Type, Content, Style, Skills, and Preferences"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-ge-accent shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+          <span>Settings</span>
+        </button>
 
         <button
           type="button"
@@ -2782,12 +2807,175 @@ input.blank.incorrect { border-color: #f43f5e !important; background: rgba(244, 
     </div>
   </div>
 
+  <!-- Settings modal: direct editing of Document Type, Content, Style, Custom Entries, Skills, and PREFERENCES.md -->
+  {#if isSettingsOpen}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onclick={(e) => { if (e.target === e.currentTarget) isSettingsOpen = false; }} role="dialog" aria-modal="true">
+      <div class="bg-ge-card border border-ge-border rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden ring-1 ring-white/10 text-white">
+        <div class="flex items-center justify-between p-4 border-b border-ge-border gap-3 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-lg font-bold text-white mr-2">Settings</span>
+            <button
+              type="button"
+              onclick={() => { settingsTab = 'prompts'; }}
+              class="px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-pointer {settingsTab === 'prompts' ? 'bg-ge-accent text-black border-ge-accent' : 'bg-ge-bg border-ge-border text-white hover:border-ge-accent/50'}"
+            >Document / Content / Style</button>
+            <button
+              type="button"
+              onclick={() => { settingsTab = 'custom'; }}
+              class="px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-pointer {settingsTab === 'custom' ? 'bg-ge-accent text-black border-ge-accent' : 'bg-ge-bg border-ge-border text-white hover:border-ge-accent/50'}"
+            >Saved Presets ({customEntries.length})</button>
+            <button
+              type="button"
+              onclick={() => { isSettingsOpen = false; openSkillsModal('library'); }}
+              class="px-3 py-1.5 rounded-lg text-sm font-semibold border bg-ge-bg border-ge-border text-white hover:border-ge-accent/50 cursor-pointer"
+            >Skills &amp; Contracts ({savedSkills.length})</button>
+            <button
+              type="button"
+              onclick={() => { settingsTab = 'prefs'; }}
+              class="px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-pointer {settingsTab === 'prefs' ? 'bg-ge-accent text-black border-ge-accent' : 'bg-ge-bg border-ge-border text-white hover:border-ge-accent/50'}"
+            >PREFERENCES.md</button>
+          </div>
+          <button type="button" class="text-neutral-300 hover:text-white text-xl cursor-pointer" onclick={() => { isSettingsOpen = false; }}>✕</button>
+        </div>
+
+        {#if settingsTab === 'prompts'}
+          <div class="p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-4">
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-bold text-white">1. Document Type Prompt ({layoutLabel})</label>
+                <button
+                  type="button"
+                  onclick={() => { typeSpace = typePromptForMode(previewMode); }}
+                  class="text-sm text-neutral-300 hover:text-ge-accent underline cursor-pointer"
+                >Reset to default</button>
+              </div>
+              <textarea
+                bind:value={typeSpace}
+                rows="4"
+                class="w-full bg-ge-bg border border-ge-border rounded-lg p-3 text-sm font-mono text-white focus:border-ge-accent outline-none resize-y leading-relaxed"
+              ></textarea>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-bold text-white">2. Content / Format Prompt ({contentLabel})</label>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onclick={() => { formatSpace = DEFAULT_FORMAT_PROMPT; }}
+                    class="text-sm text-neutral-300 hover:text-ge-accent underline cursor-pointer"
+                  >Reset to Worksheet</button>
+                  <button
+                    type="button"
+                    onclick={() => { formatSpace = ''; }}
+                    class="text-sm text-neutral-300 hover:text-ge-danger underline cursor-pointer"
+                  >Clear</button>
+                </div>
+              </div>
+              <textarea
+                bind:value={formatSpace}
+                rows="6"
+                placeholder="Format blueprint (used by Worksheet / custom content modes; empty for Offline Video Immersion Guide)."
+                class="w-full bg-ge-bg border border-ge-border rounded-lg p-3 text-sm font-mono text-white placeholder:text-neutral-500 focus:border-ge-accent outline-none resize-y leading-relaxed"
+              ></textarea>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-bold text-white">3. Style Prompt ({styleLabel})</label>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onclick={() => setStyleChoice('auto')}
+                    class="text-sm text-neutral-300 hover:text-ge-accent underline cursor-pointer"
+                  >Auto</button>
+                  <button
+                    type="button"
+                    onclick={() => setStyleChoice('gitenglish')}
+                    class="text-sm text-neutral-300 hover:text-ge-accent underline cursor-pointer"
+                  >gitEnglish</button>
+                  <button
+                    type="button"
+                    onclick={() => setStyleChoice('design-md')}
+                    class="text-sm text-neutral-300 hover:text-ge-accent underline cursor-pointer"
+                  >DESIGN.md</button>
+                </div>
+              </div>
+              <textarea
+                bind:value={styleSpace}
+                rows="6"
+                placeholder="Empty = Auto (let the agent pick). Or paste your style tokens / DESIGN.md here."
+                class="w-full bg-ge-bg border border-ge-border rounded-lg p-3 text-sm font-mono text-white placeholder:text-neutral-500 focus:border-ge-accent outline-none resize-y leading-relaxed"
+              ></textarea>
+            </div>
+          </div>
+        {:else if settingsTab === 'custom'}
+          <div class="p-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                onclick={() => { isSettingsOpen = false; openCustomEditor('content'); }}
+                class="px-3 py-1.5 rounded-lg bg-ge-accent text-black font-bold text-sm hover:brightness-110 cursor-pointer"
+              >+ New Content Preset</button>
+              <button
+                type="button"
+                onclick={() => { isSettingsOpen = false; openCustomEditor('style'); }}
+                class="px-3 py-1.5 rounded-lg bg-ge-bg border border-ge-border hover:border-ge-accent text-white font-semibold text-sm cursor-pointer"
+              >+ New Style Preset</button>
+            </div>
+            {#if customEntries.length === 0}
+              <p class="text-sm text-neutral-300 py-4">No custom Content or Style presets saved yet.</p>
+            {:else}
+              {#each customEntries as entry (entry.id)}
+                <div class="p-3 rounded-xl bg-ge-bg border border-ge-border flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-bold text-white">{entry.name} <span class="text-xs font-mono text-neutral-400 uppercase ml-1">({entry.kind})</span></div>
+                    <div class="text-sm text-neutral-400 truncate">{entry.text.slice(0, 120)}</div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onclick={() => {
+                        if (entry.kind === 'content') { appMode = 'sheet'; formatSpace = entry.text; }
+                        else { styleSpace = entry.text; }
+                        settingsTab = 'prompts';
+                      }}
+                      class="px-2.5 py-1 rounded-lg bg-ge-card border border-ge-border hover:border-ge-accent text-sm text-white cursor-pointer"
+                    >Load &amp; Edit</button>
+                    <button
+                      type="button"
+                      onclick={() => deleteCustomEntry(entry.id)}
+                      class="px-2.5 py-1 rounded-lg bg-ge-card border border-ge-border hover:border-ge-danger text-sm text-ge-danger cursor-pointer"
+                    >Delete</button>
+                  </div>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {:else}
+          <div class="p-4 flex-1 min-h-0 overflow-y-auto">
+            <pre class="text-sm font-mono text-white whitespace-pre-wrap bg-ge-bg border border-ge-border rounded-lg p-4 leading-relaxed">{PREFERENCES_TEXT}</pre>
+          </div>
+        {/if}
+
+        <div class="p-3.5 border-t border-ge-border flex items-center justify-between">
+          <span class="text-sm text-neutral-400">Edits to Document Type, Content, and Style save automatically to localStorage.</span>
+          <button
+            type="button"
+            onclick={() => { isSettingsOpen = false; }}
+            class="px-4 py-1.5 text-sm rounded-lg bg-ge-accent text-black font-bold hover:brightness-110 cursor-pointer"
+          >Done</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <!-- Add new: content / style fill-in, pre-filled with the schema -->
   {#if customEditorKind}
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onclick={(e) => { if (e.target === e.currentTarget) customEditorKind = null; }} role="dialog" aria-modal="true">
       <div class="bg-ge-card border border-ge-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden ring-1 ring-white/10">
         <div class="flex items-center justify-between p-4 border-b border-ge-border">
-          <span class="text-lg font-bold text-white">Add new {customEditorKind === 'content' ? 'content' : 'style'}</span>
+          <span class="text-lg font-bold text-white">Add new</span>
           <button type="button" class="text-neutral-300 hover:text-white text-xl cursor-pointer" onclick={() => { customEditorKind = null; }}>✕</button>
         </div>
         <div class="p-4 flex flex-col gap-3 min-h-0 overflow-y-auto">

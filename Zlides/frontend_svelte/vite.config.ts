@@ -134,11 +134,11 @@ export default defineConfig(() => {
                 const assemble = (pages: string[]): string => {
                   if (pages.length === 0) return unescaped;
                   const first = pages[0];
-                  let headInner = extractHead(first);
-                  const fix = `\n<style>\nhtml,body{background:#0f1112 !important;margin:0;padding:0;}\nbody{overflow:auto !important;height:auto !important;min-height:100vh;color:#e5e7eb;}\n.slide{width:100% !important;max-width:1280px !important;margin:0 auto !important;height:auto !important;min-height:0 !important;max-width:100%;}\n</style>`;
-                  headInner += fix;
-                  const bodies = pages.map(extractBody).join('\n<!-- zlides:page-break -->\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
-                  return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n<body style="background:#0f1112;color:#e5e7eb;margin:0;padding:24px;max-width:100%;overflow:auto;">\n${bodies}\n</body>\n</html>`;
+                  const headInner = extractHead(first);
+                  const bodyOpenMatch = first.match(/<body[^>]*>/i);
+                  const bodyOpen = bodyOpenMatch ? bodyOpenMatch[0] : '<body>';
+                  const bodies = pages.map(extractBody).join('\n<!-- zlides:page-break -->\n');
+                  return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n${bodyOpen}\n${bodies}\n</body>\n</html>`;
                 };
                 const dc = (unescaped.match(/<!DOCTYPE/gi) || []).length;
                 if (dc <= 1 && unescaped.includes('zlides-page-separator')) {

@@ -132,15 +132,11 @@ export function assembleSingleDocument(pageHtmls: string[]): string {
     return sanitized[0];
   }
   const first = sanitized[0];
-  let headInner = extractHeadInner(first);
-  const responsiveFix = `\n<style>\nhtml,body{background:#0f1112 !important;margin:0;padding:0;}\nbody{overflow:auto !important;height:auto !important;min-height:100vh;color:#e5e7eb;}\n.slide{width:100% !important;max-width:1280px !important;margin:0 auto !important;height:auto !important;min-height:0 !important;max-width:100%;}\nmain{max-width:100%;}\n@media (max-width:1280px){.slide{max-width:100% !important;}}\n</style>`;
-  if (!headInner.includes("background:#0f1112") && !headInner.includes("--bg")) {
-    headInner += responsiveFix;
-  } else {
-    headInner += responsiveFix;
-  }
-  const bodies = sanitized.map(extractBodyInner).join('\n<!-- zlides:page-break -->\n<div class="zlides-page-separator" style="height:1px;background:#2e3236;margin:24px 0;"></div>\n');
-  return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n<body style="background:#0f1112;color:#e5e7eb;margin:0;padding:24px;max-width:100%;overflow:auto;">\n${bodies}\n</body>\n</html>`;
+  const headInner = extractHeadInner(first);
+  const bodyOpenMatch = first.match(/<body[^>]*>/i);
+  const bodyOpen = bodyOpenMatch ? bodyOpenMatch[0] : '<body>';
+  const bodies = sanitized.map(extractBodyInner).join('\n<!-- zlides:page-break -->\n');
+  return `<!DOCTYPE html>\n<html lang="en">\n<head>${headInner}\n</head>\n${bodyOpen}\n${bodies}\n</body>\n</html>`;
 }
 
 export function splitSavedPages(html: string): string[] {

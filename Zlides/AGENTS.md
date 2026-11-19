@@ -42,7 +42,7 @@ If a change makes the app fail to render, that change is reverted — not "impro
    arrow (send) right, an expand icon that opens the writing area large. Stop replaces the
    arrow while running. The writing box must be visibly framed (copy/paste/edit in place).
 5. **Content and Style each have `Add new`** → a fill-in (name + text) pre-filled with the
-   schema: style → the design.md schema he gave us, content → the blueprint. Saved entries
+   schema: style → the design.md schema he gave us, content → the format contract. Saved entries
    appear in their dropdowns. This is the only "custom" path; there is no bare "Custom" item.
 6. **PREFERENCES.md is its own thing**: taken with every call, reachable from the top bar.
    AGENTS.md has nothing to do with generation.
